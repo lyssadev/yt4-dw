@@ -1,7 +1,7 @@
 # YT4 DW
 
 ## Description
-YT4 DW is a Python script designed to download YouTube videos with audio in MP4 format. It allows users to select the quality and format of the video they wish to download. The script is compatible with Termux and Linux environments.
+YT4 DW is a Python script designed to download YouTube videos with audio in MP4 format. The script is compatible with Termux and Linux environments.
 
 ## Features
 - Download videos from YouTube with audio.
