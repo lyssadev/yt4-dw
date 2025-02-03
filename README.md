@@ -1,90 +1,115 @@
-# YT4 DW
+# YT4 DW - Advanced YouTube Downloader
 
-## Description
-YT4 DW is a Python script designed to download YouTube videos with audio in MP4 format. The script is compatible with Termux and Linux environments.
+<div align="center">
 
-## Features
-- Download videos from YouTube with audio.
-- Choose from available quality options.
-- Animated text outputs for a better user experience.
-- Colorful terminal output for enhanced visibility.
+![YT4 DW Logo](https://raw.githubusercontent.com/lyssadev/yt4-dw/main/assets/logo.png)
 
-## Requirements
-To run this script, you need to install the following dependencies:
+A powerful and user-friendly YouTube downloader optimized for Linux and Termux
 
-- `yt-dlp`: A youtube-dl fork with additional features and fixes.
-- `colorama`: A library for colored terminal text.
-- `requests`: A simple, yet elegant HTTP library.
-- `art`: A library for ASCII art.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.7+](https://img.shields.io/badge/python-3.7+-blue.svg)](https://www.python.org/downloads/)
+[![yt-dlp](https://img.shields.io/badge/powered%20by-yt--dlp-red.svg)](https://github.com/yt-dlp/yt-dlp)
 
-## Installation
-1. Clone the repository:
-   ```sh
-   git clone https://github.com/lyssadev/yt4-dw.git
-   cd yt4-dw
-   ```
+</div>
 
-2. Install the required packages:
-   ```sh
-   pip install -r requirements.txt
-   ```
+## ✨ Features
 
-   Alternatively, you can install the packages manually:
-   ```sh
-   pip install yt-dlp colorama requests art
-   ```
+- 🎥 Download YouTube videos in multiple formats:
+  - MP4 video (360p, 480p, 720p, 1080p)
+  - MP3 audio extraction
+- 🎨 Beautiful and intuitive CLI interface
+- 🚀 Optimized for both Linux and Termux
+- 📊 Real-time download progress tracking
+- 🔒 Cookie support for age-restricted content
+- 💾 Configurable download path
+- ⚡ Fast and efficient downloads using yt-dlp
 
-## Usage
-To use the script, run the following command in your terminal:
-```sh
-python src/main.py
+## 🚀 Installation
+
+### Prerequisites
+
+- Python 3.7 or higher
+- ffmpeg (required for audio extraction and video processing)
+
+### Linux Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/lyssadev/yt4-dw.git
+cd yt4-dw
+
+# Install ffmpeg (Ubuntu/Debian)
+sudo apt update
+sudo apt install ffmpeg
+
+# Install Python dependencies
+pip install -r requirements.txt
 ```
 
-Follow the on-screen instructions to download your desired YouTube video.
+### Termux Installation
 
-### Handling Authentication
-If you encounter an error requiring you to sign in to confirm you're not a bot, you will need to pass cookies for authentication. Follow these steps:
+```bash
+# Install required packages
+pkg update
+pkg install python ffmpeg git
 
-1. **Extract cookies from your browser:**
-   - For Chrome on Linux:
-     ```sh
-     yt-dlp --cookies-from-browser chrome
-     ```
-   - For Chrome installed via Flatpak:
-     ```sh
-     yt-dlp --cookies-from-browser chrome:~/.var/app/com.google.Chrome/
-     ```
+# Clone the repository
+git clone https://github.com/lyssadev/yt4-dw.git
+cd yt4-dw
 
-2. **Save cookies to a file:**
-   ```sh
-   yt-dlp --cookies-from-browser chrome --cookies cookies.txt
-   ```
+# Install Python dependencies
+pip install -r requirements.txt
+```
 
-3. **Use the saved cookies file:**
-   ```sh
-   yt-dlp --cookies cookies.txt <video_url>
-   ```
+## 🎮 Usage
 
-4. **Configure `config.json`:**
-   - Create a `config.json` file in the same directory as `main.py`.
-   - Add the path to your cookies file:
-     ```json
-     {
-       "cookies": "/path/to/cookies.txt"
-     }
-     ```
-
-5. **Run the script:**
-   ```sh
+1. Run the script:
+   ```bash
    python src/main.py
    ```
 
-   The script will automatically use the cookies file specified in `config.json`.
+2. Enter the YouTube video URL when prompted
 
-For more details, refer to the [yt-dlp FAQ](https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp).
+3. Choose your preferred download format:
+   - MP3 (Audio Only)
+   - MP4 - 360p
+   - MP4 - 480p
+   - MP4 - 720p
+   - MP4 - 1080p
 
-## Authors
-Coded By Chifft, Xzyyy & lyssadev
+4. Wait for the download to complete!
 
-## License
+### Cookie Support
+
+For age-restricted videos or private content:
+
+1. Export your YouTube cookies to a text file (using browser extensions like "Get cookies.txt")
+2. Place the cookies file in the project directory
+3. Enter the path to the cookies file when prompted
+
+## 📝 Configuration
+
+The script creates a `config.json` file to store your preferences:
+- Cookies file location
+- Default download path (~/Downloads/yt4-dw)
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## 📄 License
+
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Credits
+
+Created by:
+- [Chifft](https://github.com/chifft)
+- [Xzyyy](https://github.com/xzyyy)
+- [lyssadev](https://github.com/lyssadev)
+
+Special thanks to the [yt-dlp](https://github.com/yt-dlp/yt-dlp) project.
+
+## ⚠️ Disclaimer
+
+This tool is for personal use only. Please respect YouTube's terms of service and content creators' rights.
