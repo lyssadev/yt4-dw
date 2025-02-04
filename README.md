@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![YT4 DW Logo](https://raw.githubusercontent.com/lyssadev/yt4-dw/main/assets/logo.jpg)
+![YT4 DW Logo](https://raw.githubusercontent.com/lyssadev/yt4-dw/main/assets/logo.png)
 
 A powerful and user-friendly YouTube downloader optimized for Linux and Termux
 
