@@ -27,7 +27,12 @@ class YouTubeDownloader:
         self.config_path = os.path.join(self.base_dir, 'config.json')
         self.cookies_dir = os.path.join(self.base_dir, 'cookies')
         self.cookies_path = os.path.join(self.cookies_dir, 'cookies.txt')
-        self.download_path = os.path.expanduser("~/Downloads/yt4-dw")
+        
+        # Set download path based on environment
+        if os.path.exists('/data/data/com.termux'):  # Check if running in Termux
+            self.download_path = os.path.join('/storage/emulated/0/Download', 'yt4-dw')
+        else:  # Default Linux path
+            self.download_path = os.path.expanduser("~/Downloads/yt4-dw")
         
         # Create necessary directories
         os.makedirs(self.download_path, exist_ok=True)

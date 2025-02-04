@@ -91,7 +91,16 @@ For age-restricted videos or private content:
 
 The script creates a `config.json` file to store your preferences:
 - Cookies file location
-- Default download path (~/Downloads/yt4-dw)
+- Download paths:
+  - Linux: `~/Downloads/yt4-dw`
+  - Termux: `/storage/emulated/0/Download/yt4-dw`
+
+### Download Locations
+
+- **Linux Users**: Files are saved in your home directory under `~/Downloads/yt4-dw`
+- **Termux Users**: Files are saved to your device's Download folder at `/storage/emulated/0/Download/yt4-dw`
+  - Make sure to grant storage permission using `termux-setup-storage` before running the app
+  - The download folder will be accessible through your device's file manager
 
 ## 🤝 Contributing
 
