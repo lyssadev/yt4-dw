@@ -27,6 +27,7 @@ class YouTubeDownloader:
         self.config_path = os.path.join(self.base_dir, 'config.json')
         self.cookies_dir = os.path.join(self.base_dir, 'cookies')
         self.cookies_path = os.path.join(self.cookies_dir, 'cookies.txt')
+        self.version = "2.1.0"  # Updated version number
         
         # Set download path based on environment
         if os.path.exists('/data/data/com.termux'):  # Check if running in Termux
@@ -167,6 +168,21 @@ class YouTubeDownloader:
         
         return False
 
+    def check_for_updates(self) -> None:
+        """Check for updates by comparing versions with GitHub repository"""
+        if not self.config.get('auto_update_check', True):
+            return
+            
+        try:
+            response = requests.get('https://api.github.com/repos/lyssadev/yt4-dw/releases/latest')
+            if response.status_code == 200:
+                latest_version = response.json()['tag_name'].replace('v', '')
+                if latest_version > self.version:
+                    console.print(f"\n[yellow]! New version {latest_version} available![/yellow]")
+                    console.print("[yellow]! Visit: https://github.com/lyssadev/yt4-dw/releases[/yellow]")
+        except Exception:
+            pass  # Silently ignore update check failures
+
     def display_welcome(self) -> None:
         """Display welcome screen with ASCII art and info"""
         os.system('cls' if os.name == 'nt' else 'clear')
@@ -220,7 +236,7 @@ class YouTubeDownloader:
         # Add version and status info
         status = Table.grid(padding=1)
         status.add_row(
-            "[bold blue]Version:[/bold blue] [white]2.0.0[/white]",
+            f"[bold blue]Version:[/bold blue] [white]{self.version}[/white]",
             "[bold blue]Status:[/bold blue] [green]Active[/green]",
             "[bold blue]Updates:[/bold blue] [yellow]Auto-check enabled[/yellow]"
         )
@@ -345,6 +361,7 @@ class YouTubeDownloader:
     def run(self) -> None:
         """Main execution flow"""
         self.display_welcome()
+        self.check_for_updates()  # Add update check
 
         # Check system requirements with styled output
         with console.status("[bold yellow]Checking system requirements...[/bold yellow]"):
