@@ -1,7 +1,8 @@
 {
-    "cookies": "/home/runner/yt4-dw/cookies/cookies.txt",
+    "cookies": "/home/codespace/yt4-dw/cookies/cookies.txt",
     "download_path": "~/Downloads/yt4-dw",
-    "last_used_quality": "720p",
+    "last_used_quality": "360p",
     "auto_update_check": true,
-    "version": "2.1.0"
+    "version": "2.2.0",
+    "preferred_audio_format": "m4a"
 }

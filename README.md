@@ -14,15 +14,28 @@ A powerful and user-friendly YouTube downloader optimized for Linux and Termux
 
 ## ✨ Features
 
-- 🎥 Download YouTube videos in multiple formats:
-  - MP4 video (360p, 480p, 720p, 1080p)
-  - MP3 audio extraction
+- 🎥 Smart video downloads:
+  - Automatic quality selection (up to your chosen maximum)
+  - Supports resolutions from 144p to 1440p
+  - Shows best available quality before download
+  - MP4 format for best compatibility
+- 🎵 Multiple audio formats:
+  - WAV (HIGH Quality)
+  - M4A (Med-High Quality)
+  - MP3 (320kbps)
 - 🎨 Beautiful and intuitive CLI interface
 - 🚀 Optimized for both Linux and Termux
 - 📊 Real-time download progress tracking
 - 🔒 Cookie support for age-restricted content
 - 💾 Configurable download path
+- 🔄 Automatic updates with changelog
 - ⚡ Fast and efficient downloads using yt-dlp
+
+## ⚠️ Limitations
+
+- ▶️ Single video downloads only (no playlist support)
+- 🔴 Live broadcasts cannot be downloaded
+- 📱 Some videos may require cookies for access
 
 ## 🚀 Installation
 
@@ -68,39 +81,55 @@ pip install -r requirements.txt
    python src/main.py
    ```
 
-2. Enter the YouTube video URL when prompted
+2. Enter a single YouTube video URL when prompted
+   - ✅ Regular videos: `https://www.youtube.com/watch?v=...`
+   - ❌ No playlists or live broadcasts
 
-3. Choose your preferred download format:
-   - MP3 (Audio Only)
-   - MP4 - 360p
-   - MP4 - 480p
-   - MP4 - 720p
-   - MP4 - 1080p
+3. Choose your maximum preferred quality:
+   - Video Quality Options (will automatically select best available):
+     - 1440p (if available)
+     - 1080p
+     - 720p
+     - 480p
+     - 360p
+     - 240p
+     - 144p
+   - Audio Only Options:
+     - WAV (HIGH Quality)
+     - M4A (Med-High Quality)
+     - MP3 (320kbps)
 
-4. Wait for the download to complete!
+4. The system will:
+   - Show the best available quality for your selection
+   - Automatically start the download
+   - Display real-time progress
+   - Save the file in your configured download location
 
 ### Cookie Support
 
-For age-restricted videos or private content:
+For age-restricted or private videos:
 
-1. Export your YouTube cookies to a text file (using browser extensions like "Get cookies.txt")
-2. Place the cookies file in the project directory
-3. Enter the path to the cookies file when prompted
+1. Install the "Get cookies.txt" browser extension
+2. Visit YouTube and log in to your account
+3. Export your cookies to a text file
+4. Place the cookies.txt file in the `cookies` folder
+5. The app will automatically detect and use your cookies
 
 ## 📝 Configuration
 
 The script creates a `config.json` file to store your preferences:
-- Cookies file location
-- Download paths:
-  - Linux: `~/Downloads/yt4-dw`
-  - Termux: `/storage/emulated/0/Download/yt4-dw`
+- Download paths (automatically set based on your system)
+- Last used quality preference
+- Preferred audio format
+- Cookie file location
+- Auto-update settings
 
 ### Download Locations
 
-- **Linux Users**: Files are saved in your home directory under `~/Downloads/yt4-dw`
-- **Termux Users**: Files are saved to your device's Download folder at `/storage/emulated/0/Download/yt4-dw`
-  - Make sure to grant storage permission using `termux-setup-storage` before running the app
-  - The download folder will be accessible through your device's file manager
+- **Linux**: `~/Downloads/yt4-dw`
+- **Termux**: `/storage/emulated/0/Download/yt4-dw`
+  - Run `termux-setup-storage` first to grant storage access
+  - Files will be accessible in your device's Download folder
 
 ## 🤝 Contributing
 
@@ -113,9 +142,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🙏 Credits
 
 Created by:
-- [Chifft](https://github.com/chifft)
-- [Xzyyy](https://github.com/xzyyy)
-- [lyssadev](https://github.com/lyssadev)
+- [lyssadev](https://github.com/lyssadev) (Lead Developer)
+- [Chifft](https://github.com/chifft) (Second Developer)
+- [Xzyyy](https://github.com/xzyyysh) (Core Contributor)
 
 Special thanks to the [yt-dlp](https://github.com/yt-dlp/yt-dlp) project.
 

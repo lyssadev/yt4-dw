@@ -27,7 +27,7 @@ class YouTubeDownloader:
         self.config_path = os.path.join(self.base_dir, 'config.json')
         self.cookies_dir = os.path.join(self.base_dir, 'cookies')
         self.cookies_path = os.path.join(self.cookies_dir, 'cookies.txt')
-        self.version = "2.1.0"  # Updated version number
+        self.version = "2.2.0"  # Updated version number
         
         # Set download path based on environment
         if os.path.exists('/data/data/com.termux'):  # Check if running in Termux
@@ -174,14 +174,23 @@ class YouTubeDownloader:
             return
             
         try:
-            response = requests.get('https://api.github.com/repos/lyssadev/yt4-dw/releases/latest')
-            if response.status_code == 200:
-                latest_version = response.json()['tag_name'].replace('v', '')
-                if latest_version > self.version:
-                    console.print(f"\n[yellow]! New version {latest_version} available![/yellow]")
-                    console.print("[yellow]! Visit: https://github.com/lyssadev/yt4-dw/releases[/yellow]")
-        except Exception:
-            pass  # Silently ignore update check failures
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[yellow]Checking for updates...[/yellow]"),
+                transient=True,
+            ) as progress:
+                progress.add_task("", total=None)
+                response = requests.get('https://api.github.com/repos/lyssadev/yt4-dw/releases/latest')
+                if response.status_code == 200:
+                    latest_version = response.json()['tag_name'].replace('v', '')
+                    if latest_version > self.version:
+                        console.print(f"\n[yellow]! New version {latest_version} available![/yellow]")
+                        console.print("[yellow]! Visit: https://github.com/lyssadev/yt4-dw/releases[/yellow]")
+                        console.print("[yellow]! Changes in this version:[/yellow]")
+                        changes = response.json().get('body', 'No changelog available')
+                        console.print(Panel(changes, title="Changelog", border_style="yellow"))
+        except Exception as e:
+            console.print("[red]! Failed to check for updates[/red]")
 
     def display_welcome(self) -> None:
         """Display welcome screen with ASCII art and info"""
@@ -203,7 +212,7 @@ class YouTubeDownloader:
         credits = Table.grid(padding=1)
         credits.add_row("[bold magenta]Created with ♥ by:[/bold magenta]")
         credits.add_row("[yellow]• lyssadev[/yellow] ([cyan]Lead Developer[/cyan])")
-        credits.add_row("[yellow]• Chifft[/yellow] ([cyan]Core Contributor[/cyan])")
+        credits.add_row("[yellow]• Chifft[/yellow] ([cyan]Second Developer[/cyan])")
         credits.add_row("[yellow]• Xzyyy[/yellow] ([cyan]Core Contributor[/cyan])")
         
         credits_panel = Panel(
@@ -249,13 +258,26 @@ class YouTubeDownloader:
             'quiet': True,
             'no_warnings': True,
             'extract_flat': True,
+            'no_playlist': True,  # Prevent playlist downloads
         }
         if cookies:
             ydl_opts['cookiefile'] = cookies
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             try:
-                return ydl.extract_info(url, download=False)
+                info = ydl.extract_info(url, download=False)
+                
+                # Check if it's a playlist
+                if info.get('_type') == 'playlist':
+                    console.print("[red]✗ Error: Playlists are not supported. Please provide a single video URL.[/red]")
+                    return None
+                
+                # Check if it's a live broadcast
+                if info.get('is_live', False):
+                    console.print("[red]✗ Error: Live broadcasts cannot be downloaded. Please wait until the stream ends.[/red]")
+                    return None
+                
+                return info
             except Exception as e:
                 console.print(f"[red]Error getting video info: {str(e)}[/red]")
                 return None
@@ -268,6 +290,8 @@ class YouTubeDownloader:
             'cookiefile': cookies if cookies else None,
             'progress_hooks': [self.progress_hook],
             'merge_output_format': 'mp4',  # Force MP4 output
+            'no_playlist': True,  # Prevent playlist downloads
+            'noplaylist': True,   # Additional playlist prevention
             'postprocessors': [{
                 'key': 'FFmpegVideoConvertor',
                 'preferedformat': 'mp4',  # Force MP4 conversion
@@ -320,24 +344,78 @@ class YouTubeDownloader:
         except ffmpeg.Error as e:
             console.print(f"[red]Error extracting audio: {str(e)}[/red]")
 
-    def get_format_choice(self, formats: list) -> str:
-        """Let user choose download format"""
-        choices = [
-            "MP3 (Audio Only - 320kbps)",
-            "MP4 - 360p",
-            "MP4 - 480p",
-            "MP4 - 720p",
-            "MP4 - 1080p"
+    def get_format_choice(self) -> str:
+        """Get user's preferred format choice before fetching video info"""
+        # Predefined quality options
+        video_qualities = [
+            "1440p",
+            "1080p",
+            "720p",
+            "480p",
+            "360p",
+            "240p",
+            "144p"
         ]
         
+        audio_qualities = [
+            "Audio Only (WAV HIGH)",
+            "Audio Only (M4A Med-High)",
+            "Audio Only (MP3 320kbps)"
+        ]
+        
+        # Combine all choices
+        choices = video_qualities + audio_qualities
+
+        # Ask user for choice
         questions = [
             inquirer.List('format',
-                         message="Select download format",
-                         choices=choices)
+                         message='Select maximum quality (will automatically select best available up to this quality):',
+                         choices=choices,
+                         default=self.config.get('last_used_quality', '720p'))
         ]
-        
-        answer = inquirer.prompt(questions)
-        return answer['format']
+
+        answers = inquirer.prompt(questions)
+        chosen_quality = answers['format']
+
+        # Save the choice
+        self.config['last_used_quality'] = chosen_quality
+        self.save_config(self.config)
+
+        return chosen_quality
+
+    def get_best_format_for_quality(self, formats: list, chosen_quality: str) -> str:
+        """Get the best available format that matches the user's quality preference"""
+        if 'Audio Only' in chosen_quality:
+            audio_formats = [f for f in formats if f.get('acodec') != 'none' and f.get('vcodec') == 'none']
+            
+            if 'WAV' in chosen_quality:
+                format_id = 'bestaudio[ext=wav]/bestaudio/best'
+            elif 'M4A' in chosen_quality:
+                format_id = 'bestaudio[ext=m4a]/bestaudio/best'
+            else:  # MP3
+                format_id = 'bestaudio[ext=mp3]/bestaudio/best'
+            
+            return format_id
+        else:
+            # Extract the height from the quality string (e.g., "1080p" -> 1080)
+            target_height = int(chosen_quality.replace('p', ''))
+            
+            # Get all video formats with both video and audio
+            video_formats = [f for f in formats 
+                           if f.get('vcodec') != 'none' 
+                           and f.get('acodec') != 'none'
+                           and f.get('height', 0) <= target_height]
+            
+            if video_formats:
+                # Sort by height and get the best quality that's <= target_height
+                video_formats.sort(key=lambda x: (x.get('height', 0), x.get('filesize', 0)), reverse=True)
+                best_format = video_formats[0]
+                actual_height = best_format.get('height', 0)
+                console.print(f"[yellow]ℹ Best available quality: {actual_height}p[/yellow]")
+                return best_format['format_id']
+            else:
+                # Fallback format string if no exact match found
+                return f"bestvideo[height<={target_height}][ext=mp4]+bestaudio[ext=m4a]/best[height<={target_height}]/best"
 
     def get_cookies_path(self) -> Optional[str]:
         """Get the path to cookies file"""
@@ -358,10 +436,22 @@ class YouTubeDownloader:
         
         return None
 
+    def ask_continue(self) -> bool:
+        """Ask user if they want to continue downloading"""
+        questions = [
+            inquirer.List('continue',
+                         message='Would you like to download another video?',
+                         choices=['Yes', 'No (Exit)'],
+                         default='Yes')
+        ]
+
+        answers = inquirer.prompt(questions)
+        return answers['continue'] == 'Yes'
+
     def run(self) -> None:
         """Main execution flow"""
         self.display_welcome()
-        self.check_for_updates()  # Add update check
+        self.check_for_updates()
 
         # Check system requirements with styled output
         with console.status("[bold yellow]Checking system requirements...[/bold yellow]"):
@@ -378,57 +468,62 @@ class YouTubeDownloader:
             console.print("[green]✓ ffmpeg installation: OK[/green]")
             console.print()
 
-        # Get video URL with styled prompt
-        url = console.input("[bold cyan]╭─[/bold cyan] Enter YouTube URL\n[bold cyan]╰─>[/bold cyan] ")
-        
-        # Handle cookies automatically
-        cookies = self.get_cookies_path()
-        if cookies:
-            console.print(f"[green]✓ Using cookies from: {cookies}[/green]")
-        else:
-            console.print("[yellow]! No cookies file found. Some videos may be restricted.[/yellow]")
-            console.print("[yellow]! Place a cookies.txt file in the 'cookies' folder to enable restricted video access.[/yellow]")
+        while True:
+            # Get video URL with styled prompt
+            url = console.input("[bold cyan]╭─[/bold cyan] Enter YouTube URL\n[bold cyan]╰─>[/bold cyan] ")
+            
+            # Get format choice before fetching video info
+            chosen_quality = self.get_format_choice()
+            
+            # Handle cookies automatically
+            cookies = self.get_cookies_path()
+            if cookies:
+                console.print(f"[green]✓ Using cookies from: {cookies}[/green]")
+            else:
+                console.print("[yellow]! No cookies file found. Some videos may be restricted.[/yellow]")
+                console.print("[yellow]! Place a cookies.txt file in the 'cookies' folder to enable restricted video access.[/yellow]")
 
-        # Get video information with styled progress
-        with console.status("[bold yellow]Fetching video information...[/bold yellow]") as status:
-            video_info = self.get_video_info(url, cookies)
-            if not video_info:
-                console.print("[red]✗ Failed to get video information. Please check the URL and try again.[/red]")
-                if not cookies:
-                    console.print("\n[yellow]Tip: This video might require authentication.[/yellow]")
-                    console.print("[yellow]1. Export cookies from your browser using 'Get cookies.txt' extension[/yellow]")
-                    console.print("[yellow]2. Place the cookies.txt file in the 'cookies' folder[/yellow]")
-                    console.print("[yellow]3. Try downloading again[/yellow]")
-                return
-            status.update("[green]✓ Video information retrieved![/green]")
+            # Get video information with styled progress
+            with console.status("[bold yellow]Fetching video information...[/bold yellow]") as status:
+                video_info = self.get_video_info(url, cookies)
+                if not video_info:
+                    console.print("[red]✗ Failed to get video information. Please check the URL and try again.[/red]")
+                    if not cookies:
+                        console.print("\n[yellow]Tip: This video might require authentication.[/yellow]")
+                        console.print("[yellow]1. Export cookies from your browser using 'Get cookies.txt' extension[/yellow]")
+                        console.print("[yellow]2. Place the cookies.txt file in the 'cookies' folder[/yellow]")
+                        console.print("[yellow]3. Try downloading again[/yellow]")
+                    if not self.ask_continue():
+                        break
+                    continue
+                status.update("[green]✓ Video information retrieved![/green]")
 
-        # Get format choice with styled prompt
-        console.print("\n[bold cyan]╭─[/bold cyan] Available Download Options")
-        format_choice = self.get_format_choice(video_info.get('formats', []))
-        
-        # Set format ID and process download
-        if format_choice == "MP3 (Audio Only - 320kbps)":
-            format_id = "bestaudio/best"
-            audio_only = True
-            console.print("[yellow]ℹ Selected format: MP3 Audio (320kbps)[/yellow]")
-        else:
-            quality = format_choice.split(' - ')[1].replace('p', '')
-            # Updated format selection for better quality matching
-            format_id = f"bestvideo[height={quality}][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<={quality}][ext=mp4]+bestaudio[ext=m4a]/best[height<={quality}][ext=mp4]/best[ext=mp4]/best"
-            audio_only = False
-            console.print(f"[yellow]ℹ Selected format: MP4 {quality}p[/yellow]")
+            # Get best format based on chosen quality
+            format_id = self.get_best_format_for_quality(video_info.get('formats', []), chosen_quality)
+            
+            # Set audio only flag
+            audio_only = 'Audio Only' in chosen_quality
+            
+            # Download with styled progress
+            console.print("\n[bold cyan]╭─[/bold cyan] Download Progress")
+            self.download_video(url, format_id, cookies)
+            
+            if audio_only:
+                console.print("[green]✓ Audio extraction completed automatically![/green]")
 
-        # Download with styled progress
-        console.print("\n[bold cyan]╭─[/bold cyan] Download Progress")
-        self.download_video(url, format_id, cookies)
-        
-        # Remove the audio extraction step since it's handled by yt-dlp now
-        if audio_only:
-            console.print("[green]✓ Audio extraction completed automatically![/green]")
+            # Show completion message
+            console.print("\n[bold green]Download completed successfully![/bold green]")
+            console.print(f"[yellow]Files saved in:[/yellow] {self.download_path}")
+            
+            # Ask if user wants to continue
+            if not self.ask_continue():
+                break
+            
+            # Clear screen for next download
+            os.system('cls' if os.name == 'nt' else 'clear')
+            self.display_welcome()
 
-        # Show completion message
-        console.print("\n[bold green]Download completed successfully![/bold green]")
-        console.print(f"[yellow]Files saved in:[/yellow] {self.download_path}")
+        # Show exit message
         console.print("\n[cyan]Thank you for using YT4-DW! ♥[/cyan]")
 
 def main():
@@ -439,8 +534,6 @@ def main():
         console.print("\n[yellow]Download cancelled by user[/yellow]")
     except Exception as e:
         console.print(f"\n[red]An unexpected error occurred: {str(e)}[/red]")
-    finally:
-        console.print("\n[cyan]Thank you for using YT4 DW![/cyan]")
 
 if __name__ == "__main__":
     main()
