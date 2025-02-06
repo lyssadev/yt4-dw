@@ -1,16 +1,57 @@
 {
-    "cookies": "/home/codespace/yt4-dw/cookies/cookies.txt",
-    "download_path": "~/Downloads/yt4-dw",
-    "last_used_quality": "720p (HD)",
+    "cookies": "/home/runner/yt4-dw/cookies/cookies.txt",
+    "download_path": "/home/runner/Downloads/yt4-dw",
+    "last_used_quality": "1080p",
     "auto_update_check": true,
     "update_check_interval": 24,
-    "last_update_check": 1738809810.7909555,
-    "version": "2.3.0",
+    "last_update_check": 1738811004.6084006,
     "preferred_audio_format": "m4a",
+    "download_settings": {
+        "max_retries": 3,
+        "timeout": 30,
+        "chunk_size": 8192,
+        "max_concurrent_downloads": 1,
+        "use_aria2": false,
+        "rate_limit": 0,
+        "force_ipv4": false
+    },
+    "format_settings": {
+        "prefer_quality": "1080p",
+        "fallback_quality": "720p",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "container": "mp4",
+        "force_60fps": false
+    },
+    "ui_settings": {
+        "show_thumbnails": true,
+        "show_progress_bar": true,
+        "show_eta": true,
+        "show_speed": true,
+        "show_size": true,
+        "color_scheme": "professional",
+        "progress_bar_style": "smooth",
+        "use_animations": true
+    },
     "update_settings": {
         "auto_notify": true,
         "check_beta_releases": false,
         "show_commit_history": true,
-        "max_commits_shown": 5
+        "max_commits_shown": 5,
+        "auto_backup": true
+    },
+    "notification_settings": {
+        "notify_on_complete": true,
+        "notify_on_error": true,
+        "play_sounds": true,
+        "desktop_notifications": true
+    },
+    "advanced_settings": {
+        "debug_mode": false,
+        "log_level": "INFO",
+        "proxy": null,
+        "custom_headers": {},
+        "user_agent": null,
+        "cookies_enabled": true
     }
 }

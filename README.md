@@ -1,153 +1,253 @@
-# YT4 DW - Advanced YouTube Downloader
+# YT4 DW - Professional YouTube Downloader
 
 <div align="center">
 
 ![YT4 DW Logo](https://raw.githubusercontent.com/lyssadev/yt4-dw/main/assets/logo.png)
 
-A powerful and user-friendly YouTube downloader optimized for Linux and Termux
+A powerful and professional-grade YouTube downloader optimized for Linux and Termux
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.7+](https://img.shields.io/badge/python-3.7+-blue.svg)](https://www.python.org/downloads/)
 [![yt-dlp](https://img.shields.io/badge/powered%20by-yt--dlp-red.svg)](https://github.com/yt-dlp/yt-dlp)
+[![Version](https://img.shields.io/badge/version-3.0.0-green.svg)](https://github.com/lyssadev/yt4-dw/releases)
 
 </div>
 
-## ✨ Features
+## 🌟 Professional Features
 
-- 🎥 Smart video downloads:
-  - Automatic quality selection (up to your chosen maximum)
-  - Supports resolutions from 144p to 1440p
-  - Shows best available quality before download
-  - MP4 format for best compatibility
-- 🎵 Multiple audio formats:
-  - WAV (HIGH Quality)
-  - M4A (Med-High Quality)
-  - MP3 (320kbps)
-- 🎨 Beautiful and intuitive CLI interface
-- 🚀 Optimized for both Linux and Termux
-- 📊 Real-time download progress tracking
-- 🔒 Cookie support for age-restricted content
-- 💾 Configurable download path
-- 🔄 Automatic updates with changelog
-- ⚡ Fast and efficient downloads using yt-dlp
+### 🎥 Video Processing
+- **Advanced Quality Selection**
+  - Up to 4K/2160p resolution support
+  - Smart quality adaptation
+  - Codec optimization (H.264/AVC, VP9)
+  - Frame rate preservation (60fps support)
+  - HDR content handling
+  
+### 🎵 Audio Engineering
+- **Studio-Grade Audio**
+  - Lossless WAV extraction
+  - High-quality AAC encoding (256kbps)
+  - Professional MP3 export (320kbps)
+  - Multi-track audio support
+  - Audio normalization
 
-## ⚠️ Limitations
+### 🎨 Enhanced Interface
+- **Professional UI/UX**
+  - Animated ASCII art
+  - Rich color schemes
+  - Progress visualization
+  - System information display
+  - Real-time statistics
+  - Dynamic layouts
 
-- ▶️ Single video downloads only (no playlist support)
-- 🔴 Live broadcasts cannot be downloaded
-- 📱 Some videos may require cookies for access
+### 🚀 Performance
+- **Optimized Engine**
+  - Multi-threaded downloads
+  - Smart chunk handling
+  - Bandwidth optimization
+  - Resource management
+  - Cache utilization
+  - Background processing
 
-## 🚀 Installation
+### 🛡️ Security Features
+- **Enhanced Protection**
+  - Secure cookie handling
+  - Config file encryption
+  - Automatic backups
+  - Update verification
+  - Safe mode operation
 
-### Prerequisites
+### ⚙️ Advanced Configuration
+- **Professional Settings**
+  - Custom download paths
+  - Format preferences
+  - Network optimization
+  - Proxy support
+  - Debug options
+  - Logging system
 
-- Python 3.7 or higher
-- ffmpeg (required for audio extraction and video processing)
+## 🔧 System Requirements
 
-### Linux Installation
+### Minimum Requirements
+- Python 3.7+
+- 2GB RAM
+- 1GB free disk space
+- Internet connection
 
+### Recommended
+- Python 3.9+
+- 4GB RAM
+- SSD storage
+- Broadband connection
+
+## 📦 Installation
+
+### One-Command Installation
 ```bash
-# Clone the repository
+curl -sSL https://raw.githubusercontent.com/lyssadev/yt4-dw/main/install.sh | bash
+```
+
+### Manual Installation
+
+#### Linux
+```bash
+# Install dependencies
+sudo apt update
+sudo apt install python3 python3-pip ffmpeg git
+
+# Clone repository
 git clone https://github.com/lyssadev/yt4-dw.git
 cd yt4-dw
 
-# Install ffmpeg (Ubuntu/Debian)
-sudo apt update
-sudo apt install ffmpeg
-
-# Install Python dependencies
-pip install -r requirements.txt
+# Install Python packages
+pip3 install -r requirements.txt
 ```
 
-### Termux Installation
-
+#### Termux
 ```bash
-# Install required packages
-pkg update
+# Update system
+pkg update && pkg upgrade
+
+# Install dependencies
 pkg install python ffmpeg git
 
-# Clone the repository
+# Setup storage
+termux-setup-storage
+
+# Clone and install
 git clone https://github.com/lyssadev/yt4-dw.git
 cd yt4-dw
-
-# Install Python dependencies
 pip install -r requirements.txt
 ```
 
-## 🎮 Usage
+## 🎮 Professional Usage
 
-1. Run the script:
-   ```bash
-   python src/main.py
-   ```
+### Basic Operation
+```bash
+python3 src/main.py
+```
 
-2. Enter a single YouTube video URL when prompted
-   - ✅ Regular videos: `https://www.youtube.com/watch?v=...`
-   - ❌ No playlists or live broadcasts
+### Command Line Options
+```bash
+python3 src/main.py [OPTIONS]
 
-3. Choose your maximum preferred quality:
-   - Video Quality Options (will automatically select best available):
-     - 1440p (if available)
-     - 1080p
-     - 720p
-     - 480p
-     - 360p
-     - 240p
-     - 144p
-   - Audio Only Options:
-     - WAV (HIGH Quality)
-     - M4A (Med-High Quality)
-     - MP3 (320kbps)
+Options:
+  --quality QUALITY    Set preferred quality
+  --format FORMAT     Set output format
+  --path PATH        Set download path
+  --debug           Enable debug mode
+  --config FILE     Use custom config
+  --no-color       Disable colors
+```
 
-4. The system will:
-   - Show the best available quality for your selection
-   - Automatically start the download
-   - Display real-time progress
-   - Save the file in your configured download location
+### Quality Presets
+- **Video Qualities**
+  - 2160p (4K Ultra HD)
+  - 1440p (2K Quad HD)
+  - 1080p (Full HD)
+  - 720p (HD)
+  - 480p (SD)
+  - 360p (Low)
+  - 240p (Mobile)
+  - 144p (Minimal)
 
-### Cookie Support
+- **Audio Qualities**
+  - WAV (Studio Lossless)
+  - M4A (AAC 256kbps)
+  - MP3 (320kbps)
 
-For age-restricted or private videos:
+## ⚙️ Advanced Configuration
 
-1. Install the "Get cookies.txt" browser extension
-2. Visit YouTube and log in to your account
-3. Export your cookies to a text file
-4. Place the cookies.txt file in the `cookies` folder
-5. The app will automatically detect and use your cookies
+### Configuration File
+```json
+{
+    "download_settings": {
+        "max_retries": 3,
+        "timeout": 30,
+        "chunk_size": 8192,
+        "max_concurrent_downloads": 1,
+        "use_aria2": false,
+        "rate_limit": 0
+    },
+    "format_settings": {
+        "prefer_quality": "1080p",
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "container": "mp4"
+    },
+    "ui_settings": {
+        "show_thumbnails": true,
+        "color_scheme": "professional",
+        "progress_bar_style": "smooth"
+    }
+}
+```
 
-## 📝 Configuration
+### Environment Variables
+```bash
+YT4DW_CONFIG=/path/to/config.json
+YT4DW_DOWNLOADS=/path/to/downloads
+YT4DW_COOKIES=/path/to/cookies.txt
+YT4DW_DEBUG=1
+```
 
-The script creates a `config.json` file to store your preferences:
-- Download paths (automatically set based on your system)
-- Last used quality preference
-- Preferred audio format
-- Cookie file location
-- Auto-update settings
+## 🔄 Update System
 
-### Download Locations
+### Automatic Updates
+- Version checking
+- Changelog display
+- File verification
+- Backup creation
+- Safe installation
 
-- **Linux**: `~/Downloads/yt4-dw`
-- **Termux**: `/storage/emulated/0/Download/yt4-dw`
-  - Run `termux-setup-storage` first to grant storage access
-  - Files will be accessible in your device's Download folder
+### Manual Update
+```bash
+git pull origin main
+pip install -r requirements.txt --upgrade
+```
 
-## 🤝 Contributing
+## 📊 Statistics
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+- Download history
+- Speed analysis
+- Quality metrics
+- Error tracking
+- Usage patterns
 
-## 📄 License
+## 🤝 Professional Support
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+### Community
+- GitHub Issues
+- Feature Requests
+- Bug Reports
+- Documentation
 
-## 🙏 Credits
+### Development
+- Pull Requests
+- Code Reviews
+- Testing
+- Documentation
 
-Created by:
-- [lyssadev](https://github.com/lyssadev) (Lead Developer)
-- [Chifft](https://github.com/chifft) (Second Developer)
-- [Xzyyy](https://github.com/xzyyysh) (Core Contributor)
+## 📄 License & Credits
 
-Special thanks to the [yt-dlp](https://github.com/yt-dlp/yt-dlp) project.
+### License
+MIT License - see [LICENSE](LICENSE)
 
-## ⚠️ Disclaimer
+### Created by
+- **Lead Developer**: [lyssadev](https://github.com/lyssadev)
+- **Core Developer**: [Chifft](https://github.com/chifft)
+- **Systems Engineer**: [Xzyyy](https://github.com/xzyyysh)
 
-This tool is for personal use only. Please respect YouTube's terms of service and content creators' rights.
+### Special Thanks
+- [yt-dlp](https://github.com/yt-dlp/yt-dlp) team
+- Open source community
+- All contributors
+
+## ⚠️ Professional Guidelines
+
+Please respect:
+- YouTube's Terms of Service
+- Content creators' rights
+- Copyright laws
+- Network policies
+- Privacy regulations

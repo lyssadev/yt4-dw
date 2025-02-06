@@ -4,85 +4,298 @@ import os
 import sys
 import json
 import time
+import shutil
+import platform
+import threading
+import subprocess
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List, Tuple, Union
+from datetime import datetime
 
+# Core functionality
 import yt_dlp
-import inquirer
 import requests
 import ffmpeg
+
+# Enhanced CLI and UI
+import typer
+import click
+import questionary
 from rich.console import Console
-from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.progress import (
+    Progress, SpinnerColumn, TextColumn,
+    BarColumn, TaskProgressColumn, TimeRemainingColumn,
+    DownloadColumn, TransferSpeedColumn
+)
 from rich.panel import Panel
 from rich.text import Text
 from rich.table import Table
-from art import text2art
+from rich.layout import Layout
+from rich.live import Live
+from rich.syntax import Syntax
+from rich.markdown import Markdown
+from rich.style import Style
+from rich.theme import Theme
+from rich.traceback import install as install_rich_traceback
+from rich.prompt import Prompt, Confirm
+from rich.status import Status
 
-# Initialize Rich console
-console = Console()
+# Visual enhancements
+from art import text2art
+from colorama import init as colorama_init
+from termcolor import colored
+from pyfiglet import Figlet
+from yaspin import yaspin
+from halo import Halo
+from alive_progress import alive_bar, config_handler
+from blessed import Terminal
+from asciimatics.screen import Screen
+from asciimatics.scene import Scene
+from asciimatics.effects import Print
+from asciimatics.renderers import FigletText, Rainbow
+
+# Initialize enhancements
+colorama_init(strip=False)
+install_rich_traceback()
+term = Terminal()
+
+# Custom theme for Rich
+CUSTOM_THEME = Theme({
+    "info": "cyan",
+    "warning": "yellow",
+    "error": "bold red",
+    "success": "bold green",
+    "command": "bold blue",
+    "path": "bold magenta",
+    "url": "underline blue",
+    "version": "bold cyan",
+    "header": "bold yellow",
+})
+
+# Initialize Rich console with custom theme
+console = Console(theme=CUSTOM_THEME)
 
 class YouTubeDownloader:
     def __init__(self):
+        """Initialize YouTube Downloader with enhanced configuration"""
         self.base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         self.config_path = os.path.join(self.base_dir, 'config.json')
         self.cookies_dir = os.path.join(self.base_dir, 'cookies')
         self.cookies_path = os.path.join(self.cookies_dir, 'cookies.txt')
-        self.version = "2.3.0"  # Updated version number
+        self.version = "3.0.0"  # Major version update
+        
+        # Repository information
         self.repo_owner = "lyssadev"
         self.repo_name = "yt4-dw"
         self.repo_url = f"https://github.com/{self.repo_owner}/{self.repo_name}"
         self.api_url = f"https://api.github.com/repos/{self.repo_owner}/{self.repo_name}"
         self.raw_content_url = f"https://raw.githubusercontent.com/{self.repo_owner}/{self.repo_name}/main"
         
+        # System detection and setup
+        self.system = platform.system().lower()
+        self.is_termux = os.path.exists('/data/data/com.termux')
+        
         # Set download path based on environment
-        if os.path.exists('/data/data/com.termux'):  # Check if running in Termux
+        if self.is_termux:
             self.download_path = os.path.join('/storage/emulated/0/Download', 'yt4-dw')
-        else:  # Default Linux path
+        else:
             self.download_path = os.path.expanduser("~/Downloads/yt4-dw")
         
         # Create necessary directories
         os.makedirs(self.download_path, exist_ok=True)
         os.makedirs(self.cookies_dir, exist_ok=True)
         
-        # Initialize config
+        # Initialize configuration
         self.config = self.load_config()
-        self.console = Console()
+        
+        # Setup terminal
+        self.term = term
+        self.screen_width = self.term.width or 80
+        self.screen_height = self.term.height or 24
+        
+        # Initialize progress tracking
+        self.current_task = None
+        self.download_start_time = None
+        self.total_size = 0
+        self.downloaded_size = 0
+        
+        # Setup download statistics
+        self.stats = {
+            'total_downloads': 0,
+            'failed_downloads': 0,
+            'total_size': 0,
+            'session_start': time.time()
+        }
+        
+        # Initialize visual elements
+        self.spinner = yaspin(color="cyan")
+        self.halo = Halo(spinner='dots')
 
     def load_config(self) -> Dict[str, Any]:
-        """Load configuration from config.json"""
+        """Load configuration with enhanced settings and validation"""
         default_config = {
             "cookies": self.cookies_path,
             "download_path": self.download_path,
-            "last_used_quality": "720p",
+            "last_used_quality": "1080p (Full HD)",
             "auto_update_check": True,
             "update_check_interval": 24,  # Hours between update checks
-            "last_update_check": 0  # Timestamp of last check
+            "last_update_check": 0,  # Timestamp of last check
+            "preferred_audio_format": "m4a",
+            "download_settings": {
+                "max_retries": 3,
+                "timeout": 30,
+                "chunk_size": 8192,
+                "max_concurrent_downloads": 1,
+                "use_aria2": False,
+                "rate_limit": 0,  # 0 = unlimited
+                "force_ipv4": False
+            },
+            "format_settings": {
+                "prefer_quality": "1080p",
+                "fallback_quality": "720p",
+                "video_codec": "h264",
+                "audio_codec": "aac",
+                "container": "mp4",
+                "force_60fps": False
+            },
+            "ui_settings": {
+                "show_thumbnails": True,
+                "show_progress_bar": True,
+                "show_eta": True,
+                "show_speed": True,
+                "show_size": True,
+                "color_scheme": "default",
+                "progress_bar_style": "smooth",
+                "use_animations": True
+            },
+            "update_settings": {
+                "auto_notify": True,
+                "check_beta_releases": False,
+                "show_commit_history": True,
+                "max_commits_shown": 5,
+                "auto_backup": True
+            },
+            "notification_settings": {
+                "notify_on_complete": True,
+                "notify_on_error": True,
+                "play_sounds": True,
+                "desktop_notifications": True
+            },
+            "advanced_settings": {
+                "debug_mode": False,
+                "log_level": "INFO",
+                "proxy": None,
+                "custom_headers": {},
+                "user_agent": None,
+                "cookies_enabled": True
+            }
         }
         
         try:
-            if os.path.exists(self.config_path):
-                with open(self.config_path, 'r') as file:
-                    config = json.load(file)
-                    # Update default config with loaded values
-                    default_config.update(config)
+            # Create config directory if it doesn't exist
+            os.makedirs(os.path.dirname(self.config_path), exist_ok=True)
             
-            # Save the config (this will create it if it doesn't exist)
+            if os.path.exists(self.config_path):
+                # Backup existing config before loading
+                if self._should_backup_config():
+                    self._backup_config()
+                
+                # Load and validate existing config
+                with open(self.config_path, 'r', encoding='utf-8') as file:
+                    config = json.load(file)
+                    
+                # Recursively update default config with loaded values
+                self._update_config_recursive(default_config, config)
+                
+                # Validate the merged config
+                validated_config = self._validate_config(default_config)
+                
+                # Save the validated config
+                self.save_config(validated_config)
+                return validated_config
+            
+            # If no config exists, save and return default
             self.save_config(default_config)
             return default_config
             
         except Exception as e:
-            console.print(f"[yellow]! Warning: Could not load config: {str(e)}[/yellow]")
-            console.print("[yellow]! Using default configuration[/yellow]")
+            console.print(f"[error]! Warning: Could not load config: {str(e)}[/error]")
+            console.print("[warning]! Using default configuration[/warning]")
             return default_config
 
     def save_config(self, config: Dict[str, Any]) -> None:
-        """Save configuration to config.json"""
+        """Save configuration with backup and validation"""
         try:
-            with open(self.config_path, 'w') as file:
-                json.dump(config, file, indent=4)
-            console.print("[green]✓ Configuration saved successfully[/green]")
+            # Validate config before saving
+            validated_config = self._validate_config(config)
+            
+            # Create backup if needed
+            if self._should_backup_config():
+                self._backup_config()
+            
+            # Save with pretty formatting
+            with open(self.config_path, 'w', encoding='utf-8') as file:
+                json.dump(validated_config, file, indent=4, ensure_ascii=False)
+            
+            console.print("[success]✓ Configuration saved successfully[/success]")
         except Exception as e:
-            console.print(f"[yellow]! Warning: Could not save config: {str(e)}[/yellow]")
+            console.print(f"[error]! Error saving config: {str(e)}[/error]")
+            
+    def _update_config_recursive(self, default: Dict, update: Dict) -> None:
+        """Recursively update configuration while preserving structure"""
+        for key, value in update.items():
+            if key in default:
+                if isinstance(value, dict) and isinstance(default[key], dict):
+                    self._update_config_recursive(default[key], value)
+                else:
+                    default[key] = value
+
+    def _validate_config(self, config: Dict[str, Any]) -> Dict[str, Any]:
+        """Validate and sanitize configuration values"""
+        validated = config.copy()
+        
+        # Validate paths
+        validated['download_path'] = os.path.expanduser(config['download_path'])
+        validated['cookies'] = os.path.expanduser(config['cookies'])
+        
+        # Validate quality settings
+        valid_qualities = ['144p', '240p', '360p', '480p', '720p', '1080p', '1440p']
+        if not any(q in config['last_used_quality'] for q in valid_qualities):
+            validated['last_used_quality'] = '1080p (Full HD)'
+        
+        # Validate numeric values
+        validated['update_check_interval'] = max(1, min(168, config['update_check_interval']))
+        validated['download_settings']['max_retries'] = max(1, min(10, config['download_settings']['max_retries']))
+        validated['download_settings']['timeout'] = max(5, min(300, config['download_settings']['timeout']))
+        
+        return validated
+
+    def _should_backup_config(self) -> bool:
+        """Determine if config backup is needed"""
+        if not os.path.exists(self.config_path):
+            return False
+            
+        # Check last backup time
+        backup_path = f"{self.config_path}.backup"
+        if not os.path.exists(backup_path):
+            return True
+            
+        # Backup if file has changed in last 24 hours
+        config_mtime = os.path.getmtime(self.config_path)
+        backup_mtime = os.path.getmtime(backup_path)
+        return (time.time() - config_mtime) < 86400 and config_mtime > backup_mtime
+
+    def _backup_config(self) -> None:
+        """Create a backup of the current config file"""
+        if not os.path.exists(self.config_path):
+            return
+            
+        backup_path = f"{self.config_path}.backup"
+        try:
+            shutil.copy2(self.config_path, backup_path)
+            console.print("[info]ℹ Config backup created[/info]")
+        except Exception as e:
+            console.print(f"[warning]! Warning: Could not create config backup: {str(e)}[/warning]")
 
     def check_internet(self) -> bool:
         """Check internet connectivity"""
@@ -360,42 +573,50 @@ class YouTubeDownloader:
             return 0  # Return equal if comparison fails
 
     def display_welcome(self) -> None:
-        """Display welcome screen with ASCII art and info"""
-        os.system('cls' if os.name == 'nt' else 'clear')
+        """Display enhanced welcome screen with animations and rich formatting"""
+        # Clear screen with fade effect
+        self._clear_screen_with_effect()
         
-        # Create main title with large ASCII art
-        title_art = text2art("YT4-DW", font='block')
-        subtitle_art = text2art("YouTube Downloader", font='small')
-        
-        # Create a styled panel for the title
-        title_panel = Panel(
-            Text(title_art + "\n" + subtitle_art, style="bold cyan", justify="center"),
-            border_style="cyan",
-            padding=(1, 4)
+        # Create layout
+        layout = Layout()
+        layout.split_column(
+            Layout(name="title", size=10),
+            Layout(name="info", size=15),
+            Layout(name="status", size=3)
         )
-        console.print(title_panel)
         
-        # Create credits panel
-        credits = Table.grid(padding=1)
-        credits.add_row("[bold magenta]Created with ♥ by:[/bold magenta]")
-        credits.add_row("[yellow]• lyssadev[/yellow] ([cyan]Lead Developer[/cyan])")
-        credits.add_row("[yellow]• Chifft[/yellow] ([cyan]Second Developer[/cyan])")
-        credits.add_row("[yellow]• Xzyyy[/yellow] ([cyan]Core Contributor[/cyan])")
+        # Create title with figlet
+        title = text2art("YT4-DW", font="block")
+        version = text2art(f"v{self.version}", font="small")
         
-        credits_panel = Panel(
-            credits,
-            title="[bold]Credits[/bold]",
-            border_style="magenta",
+        # Create main title panel
+        title_text = Text()
+        title_text.append(title, style="bold cyan")
+        title_text.append(version, style="bold yellow")
+        title_text.append("\nProfessional YouTube Downloader", style="italic yellow")
+        
+        title_panel = Panel(
+            title_text,
+            title="[bold]Welcome[/bold]",
+            border_style="cyan",
             padding=(1, 2)
         )
         
-        # Create features panel
+        # Create features panel with animation
         features = Table.grid(padding=1)
-        features.add_row("[green]✓[/green] High-quality video downloads (up to 1080p)")
-        features.add_row("[green]✓[/green] MP3 audio extraction with best quality")
-        features.add_row("[green]✓[/green] Real-time progress tracking")
-        features.add_row("[green]✓[/green] Age-restricted content support")
-        features.add_row("[green]✓[/green] Optimized for Termux & Linux")
+        features.add_row("[bold magenta]Enhanced Features:[/bold magenta]")
+        
+        feature_list = [
+            "🎥 4K Video Support",
+            "🎵 Studio Quality Audio",
+            "🚀 Optimized Performance",
+            "🎨 Beautiful Interface",
+            "🔒 Enhanced Security",
+            "⚡ Smart Downloads"
+        ]
+        
+        for feature in feature_list:
+            features.add_row(f"[green]✓[/green] {feature}")
         
         features_panel = Panel(
             features,
@@ -404,20 +625,90 @@ class YouTubeDownloader:
             padding=(1, 2)
         )
         
-        # Create a grid layout for panels
-        grid = Table.grid(padding=1)
-        grid.add_row(credits_panel, features_panel)
-        console.print(grid)
-        
-        # Add version and status info
-        status = Table.grid(padding=1)
-        status.add_row(
+        # Create stats panel
+        stats = Table.grid(padding=1)
+        stats.add_row(
             f"[bold blue]Version:[/bold blue] [white]{self.version}[/white]",
             "[bold blue]Status:[/bold blue] [green]Active[/green]",
-            "[bold blue]Updates:[/bold blue] [yellow]Auto-check enabled[/yellow]"
+            f"[bold blue]Python:[/bold blue] [white]{sys.version.split()[0]}[/white]"
         )
-        console.print(Panel(status, border_style="blue"))
-        console.print()
+        
+        session_time = time.time() - self.stats['session_start']
+        stats.add_row(
+            f"[bold blue]Downloads:[/bold blue] [white]{self.stats['total_downloads']}[/white]",
+            f"[bold blue]Total Size:[/bold blue] [white]{self._format_size(self.stats['total_size'])}[/white]",
+            f"[bold blue]Session:[/bold blue] [white]{self._format_time(session_time)}[/white]"
+        )
+        
+        stats_panel = Panel(
+            stats,
+            title="[bold]Statistics[/bold]",
+            border_style="blue",
+            padding=(1, 2)
+        )
+        
+        # Create system info panel
+        sys_info = Table.grid(padding=1)
+        sys_info.add_row("[bold magenta]System Information:[/bold magenta]")
+        sys_info.add_row(f"[white]OS: {platform.system()} {platform.release()}[/white]")
+        sys_info.add_row(f"[white]Terminal: {os.environ.get('TERM', 'Unknown')}[/white]")
+        sys_info.add_row(f"[white]Resolution: {self.screen_width}x{self.screen_height}[/white]")
+        
+        sys_panel = Panel(
+            sys_info,
+            title="[bold]System[/bold]",
+            border_style="magenta",
+            padding=(1, 2)
+        )
+        
+        # Layout panels
+        layout["title"].update(title_panel)
+        
+        info_layout = Layout()
+        info_layout.split_row(
+            Layout(features_panel),
+            Layout(sys_panel)
+        )
+        layout["info"].update(info_layout)
+        layout["status"].update(stats_panel)
+        
+        # Render final layout
+        console.print(layout)
+        
+        # Show update status if available
+        if self.config['auto_update_check']:
+            with console.status("[bold yellow]Checking for updates...[/bold yellow]"):
+                self.check_for_updates()
+    
+    def _clear_screen_with_effect(self) -> None:
+        """Clear screen with fade effect"""
+        def fade_out(char: str = "░") -> None:
+            for i in range(self.screen_height):
+                sys.stdout.write(char * self.screen_width + "\n")
+                sys.stdout.flush()
+                time.sleep(0.01)
+        
+        fade_out()
+        os.system('cls' if os.name == 'nt' else 'clear')
+    
+    def _format_size(self, size: int) -> str:
+        """Format size in bytes to human readable format"""
+        for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+            if size < 1024:
+                return f"{size:.1f} {unit}"
+            size /= 1024
+        return f"{size:.1f} PB"
+    
+    def _format_time(self, seconds: float) -> str:
+        """Format time in seconds to human readable format"""
+        if seconds < 60:
+            return f"{seconds:.0f}s"
+        elif seconds < 3600:
+            minutes = seconds / 60
+            return f"{minutes:.0f}m"
+        else:
+            hours = seconds / 3600
+            return f"{hours:.1f}h"
 
     def get_video_info(self, url: str, cookies: Optional[str] = None) -> Dict[str, Any]:
         """Get video information including available formats"""
@@ -533,16 +824,12 @@ class YouTubeDownloader:
         # Combine all choices
         choices = video_qualities + audio_qualities
 
-        # Ask user for choice
-        questions = [
-            inquirer.List('format',
-                         message='Select maximum quality (will automatically select best available up to this quality):',
-                         choices=choices,
-                         default=self.config.get('last_used_quality', '720p (HD)'))
-        ]
-
-        answers = inquirer.prompt(questions)
-        chosen_quality = answers['format']
+        # Ask user for choice using questionary instead of inquirer
+        chosen_quality = questionary.select(
+            'Select maximum quality (will automatically select best available up to this quality):',
+            choices=choices,
+            default=self.config.get('last_used_quality', '720p (HD)')
+        ).ask()
         
         # Clean up the quality string for internal use
         if '(' in chosen_quality:
@@ -646,15 +933,11 @@ class YouTubeDownloader:
 
     def ask_continue(self) -> bool:
         """Ask user if they want to continue downloading"""
-        questions = [
-            inquirer.List('continue',
-                         message='Would you like to download another video?',
-                         choices=['Yes', 'No (Exit)'],
-                         default='Yes')
-        ]
-
-        answers = inquirer.prompt(questions)
-        return answers['continue'] == 'Yes'
+        return questionary.select(
+            'Would you like to download another video?',
+            choices=['Yes', 'No (Exit)'],
+            default='Yes'
+        ).ask() == 'Yes'
 
     def run(self) -> None:
         """Main execution flow"""
