@@ -27,7 +27,9 @@ class YouTubeDownloader:
         self.config_path = os.path.join(self.base_dir, 'config.json')
         self.cookies_dir = os.path.join(self.base_dir, 'cookies')
         self.cookies_path = os.path.join(self.cookies_dir, 'cookies.txt')
-        self.version = "2.2.0"  # Updated version number
+        self.version = "2.3.0"  # Updated version number
+        self.repo_url = "https://github.com/lyssadev/yt4-dw.git"
+        self.api_url = "https://api.github.com/repos/lyssadev/yt4-dw"
         
         # Set download path based on environment
         if os.path.exists('/data/data/com.termux'):  # Check if running in Termux
@@ -49,7 +51,9 @@ class YouTubeDownloader:
             "cookies": self.cookies_path,
             "download_path": self.download_path,
             "last_used_quality": "720p",
-            "auto_update_check": True
+            "auto_update_check": True,
+            "update_check_interval": 24,  # Hours between update checks
+            "last_update_check": 0  # Timestamp of last check
         }
         
         try:
@@ -169,8 +173,16 @@ class YouTubeDownloader:
         return False
 
     def check_for_updates(self) -> None:
-        """Check for updates by comparing versions with GitHub repository"""
+        """Enhanced update checker with detailed version comparison and notifications"""
         if not self.config.get('auto_update_check', True):
+            return
+            
+        # Check if we should check for updates based on interval
+        current_time = time.time()
+        last_check = self.config.get('last_update_check', 0)
+        check_interval = self.config.get('update_check_interval', 24) * 3600  # Convert hours to seconds
+        
+        if current_time - last_check < check_interval:
             return
             
         try:
@@ -180,17 +192,111 @@ class YouTubeDownloader:
                 transient=True,
             ) as progress:
                 progress.add_task("", total=None)
-                response = requests.get('https://api.github.com/repos/lyssadev/yt4-dw/releases/latest')
-                if response.status_code == 200:
-                    latest_version = response.json()['tag_name'].replace('v', '')
-                    if latest_version > self.version:
-                        console.print(f"\n[yellow]! New version {latest_version} available![/yellow]")
-                        console.print("[yellow]! Visit: https://github.com/lyssadev/yt4-dw/releases[/yellow]")
-                        console.print("[yellow]! Changes in this version:[/yellow]")
-                        changes = response.json().get('body', 'No changelog available')
-                        console.print(Panel(changes, title="Changelog", border_style="yellow"))
+                
+                # Get update settings
+                update_settings = self.config.get('update_settings', {})
+                show_commits = update_settings.get('show_commit_history', True)
+                max_commits = update_settings.get('max_commits_shown', 5)
+                check_beta = update_settings.get('check_beta_releases', False)
+                
+                # Get latest release info
+                if check_beta:
+                    response = requests.get(f"{self.api_url}/releases")
+                    if response.status_code == 200:
+                        releases = response.json()
+                        release_info = next((r for r in releases if not r['prerelease']), releases[0])
+                else:
+                    response = requests.get(f"{self.api_url}/releases/latest")
+                    if response.status_code != 200:
+                        raise Exception(f"Failed to fetch release info: {response.status_code}")
+                    release_info = response.json()
+                
+                latest_version = release_info['tag_name'].replace('v', '')
+                
+                # Compare versions
+                if self._compare_versions(latest_version, self.version) > 0:
+                    # Create update notification panel
+                    update_info = Table.grid(padding=1)
+                    
+                    # Show version info with release type
+                    release_type = " (Beta)" if release_info.get('prerelease', False) else ""
+                    update_info.add_row(
+                        f"[bold yellow]New version {latest_version}{release_type} available![/bold yellow]"
+                    )
+                    update_info.add_row(
+                        f"[white]Current version: {self.version}[/white]"
+                    )
+                    update_info.add_row("")
+                    
+                    # Add changelog
+                    changes = release_info.get('body', 'No changelog available')
+                    if changes:
+                        update_info.add_row("[bold cyan]Changelog:[/bold cyan]")
+                        for line in changes.split('\n'):
+                            if line.strip():
+                                update_info.add_row(f"[white]• {line.strip()}[/white]")
+                    
+                    # Add recent commits if enabled
+                    if show_commits:
+                        commits_response = requests.get(
+                            f"{self.api_url}/commits",
+                            params={'since': release_info['published_at']}
+                        )
+                        
+                        if commits_response.status_code == 200:
+                            commits = commits_response.json()
+                            if commits:
+                                update_info.add_row("")
+                                update_info.add_row("[bold cyan]Recent changes:[/bold cyan]")
+                                for commit in commits[:max_commits]:
+                                    msg = commit['commit']['message'].split('\n')[0]
+                                    update_info.add_row(f"[white]• {msg}[/white]")
+                    
+                    # Add update instructions
+                    update_info.add_row("")
+                    update_info.add_row("[bold cyan]To update:[/bold cyan]")
+                    update_info.add_row("[white]1. Visit: https://github.com/lyssadev/yt4-dw/releases[/white]")
+                    update_info.add_row("[white]2. Download the latest release[/white]")
+                    update_info.add_row("[white]3. Follow the update instructions in the release notes[/white]")
+                    
+                    # Add auto-update reminder if disabled
+                    if not self.config.get('auto_update_check', True):
+                        update_info.add_row("")
+                        update_info.add_row("[yellow]Note: Auto-updates are currently disabled[/yellow]")
+                        update_info.add_row("[yellow]Enable them in config.json to receive automatic notifications[/yellow]")
+                    
+                    # Display the update panel
+                    console.print(Panel(
+                        update_info,
+                        title="[bold yellow]Update Available[/bold yellow]",
+                        border_style="yellow",
+                        padding=(1, 2)
+                    ))
+                
+                # Update last check timestamp
+                self.config['last_update_check'] = current_time
+                self.save_config(self.config)
+                
         except Exception as e:
-            console.print("[red]! Failed to check for updates[/red]")
+            console.print(f"[red]! Failed to check for updates: {str(e)}[/red]")
+    
+    def _compare_versions(self, version1: str, version2: str) -> int:
+        """Compare two version strings and return:
+           1  if version1 > version2
+           0  if version1 == version2
+           -1 if version1 < version2
+        """
+        def normalize(v):
+            return [int(x) for x in v.split('.')]
+        
+        v1 = normalize(version1)
+        v2 = normalize(version2)
+        
+        if v1 > v2:
+            return 1
+        elif v1 < v2:
+            return -1
+        return 0
 
     def display_welcome(self) -> None:
         """Display welcome screen with ASCII art and info"""
@@ -346,21 +452,21 @@ class YouTubeDownloader:
 
     def get_format_choice(self) -> str:
         """Get user's preferred format choice before fetching video info"""
-        # Predefined quality options
+        # Predefined quality options with descriptions
         video_qualities = [
-            "1440p",
-            "1080p",
-            "720p",
-            "480p",
-            "360p",
-            "240p",
-            "144p"
+            "1440p (2K QHD)",
+            "1080p (Full HD)",
+            "720p (HD)",
+            "480p (SD)",
+            "360p (SD)",
+            "240p (Low)",
+            "144p (Very Low)"
         ]
         
         audio_qualities = [
-            "Audio Only (WAV HIGH)",
-            "Audio Only (M4A Med-High)",
-            "Audio Only (MP3 320kbps)"
+            "Audio Only (WAV HIGH - Lossless)",
+            "Audio Only (M4A Med-High - AAC 256kbps)",
+            "Audio Only (MP3 320kbps - High Quality)"
         ]
         
         # Combine all choices
@@ -371,11 +477,15 @@ class YouTubeDownloader:
             inquirer.List('format',
                          message='Select maximum quality (will automatically select best available up to this quality):',
                          choices=choices,
-                         default=self.config.get('last_used_quality', '720p'))
+                         default=self.config.get('last_used_quality', '720p (HD)'))
         ]
 
         answers = inquirer.prompt(questions)
         chosen_quality = answers['format']
+        
+        # Clean up the quality string for internal use
+        if '(' in chosen_quality:
+            chosen_quality = chosen_quality.split(' (')[0]  # Extract just the quality value
 
         # Save the choice
         self.config['last_used_quality'] = chosen_quality
@@ -390,31 +500,68 @@ class YouTubeDownloader:
             
             if 'WAV' in chosen_quality:
                 format_id = 'bestaudio[ext=wav]/bestaudio/best'
+                console.print("[yellow]ℹ Selecting best WAV audio quality[/yellow]")
             elif 'M4A' in chosen_quality:
                 format_id = 'bestaudio[ext=m4a]/bestaudio/best'
+                console.print("[yellow]ℹ Selecting best M4A audio quality[/yellow]")
             else:  # MP3
                 format_id = 'bestaudio[ext=mp3]/bestaudio/best'
+                console.print("[yellow]ℹ Selecting best MP3 audio quality (320kbps)[/yellow]")
             
             return format_id
         else:
             # Extract the height from the quality string (e.g., "1080p" -> 1080)
             target_height = int(chosen_quality.replace('p', ''))
             
-            # Get all video formats with both video and audio
+            # First try to find formats with both video and audio
             video_formats = [f for f in formats 
                            if f.get('vcodec') != 'none' 
                            and f.get('acodec') != 'none'
                            and f.get('height', 0) <= target_height]
             
             if video_formats:
-                # Sort by height and get the best quality that's <= target_height
-                video_formats.sort(key=lambda x: (x.get('height', 0), x.get('filesize', 0)), reverse=True)
+                # Sort by height, then by bitrate, then by filesize
+                video_formats.sort(key=lambda x: (
+                    x.get('height', 0),
+                    x.get('tbr', 0),  # Total bitrate
+                    x.get('filesize', 0)
+                ), reverse=True)
+                
                 best_format = video_formats[0]
                 actual_height = best_format.get('height', 0)
-                console.print(f"[yellow]ℹ Best available quality: {actual_height}p[/yellow]")
+                actual_fps = best_format.get('fps', 0)
+                actual_vcodec = best_format.get('vcodec', 'unknown')
+                actual_acodec = best_format.get('acodec', 'unknown')
+                
+                # Show detailed format information
+                console.print(f"[yellow]ℹ Best available quality details:[/yellow]")
+                console.print(f"[yellow]  • Resolution: {actual_height}p[/yellow]")
+                console.print(f"[yellow]  • FPS: {actual_fps}[/yellow]")
+                console.print(f"[yellow]  • Video codec: {actual_vcodec}[/yellow]")
+                console.print(f"[yellow]  • Audio codec: {actual_acodec}[/yellow]")
+                
                 return best_format['format_id']
             else:
-                # Fallback format string if no exact match found
+                # If no combined format found, try separate video+audio approach
+                console.print("[yellow]ℹ No combined format found, selecting best video and audio separately[/yellow]")
+                
+                # Get best video format below or equal to target height
+                video_formats = [f for f in formats 
+                               if f.get('vcodec') != 'none' 
+                               and f.get('height', 0) <= target_height]
+                
+                if video_formats:
+                    video_formats.sort(key=lambda x: (
+                        x.get('height', 0),
+                        x.get('tbr', 0),
+                        x.get('filesize', 0)
+                    ), reverse=True)
+                    
+                    best_video = video_formats[0]
+                    actual_height = best_video.get('height', 0)
+                    console.print(f"[yellow]ℹ Selected video quality: {actual_height}p[/yellow]")
+                
+                # Return format string for best video + best audio
                 return f"bestvideo[height<={target_height}][ext=mp4]+bestaudio[ext=m4a]/best[height<={target_height}]/best"
 
     def get_cookies_path(self) -> Optional[str]:

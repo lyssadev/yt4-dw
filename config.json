@@ -1,8 +1,16 @@
 {
     "cookies": "/home/codespace/yt4-dw/cookies/cookies.txt",
     "download_path": "~/Downloads/yt4-dw",
-    "last_used_quality": "360p",
+    "last_used_quality": "720p (HD)",
     "auto_update_check": true,
-    "version": "2.2.0",
-    "preferred_audio_format": "m4a"
+    "update_check_interval": 24,
+    "last_update_check": 0,
+    "version": "2.3.0",
+    "preferred_audio_format": "m4a",
+    "update_settings": {
+        "auto_notify": true,
+        "check_beta_releases": false,
+        "show_commit_history": true,
+        "max_commits_shown": 5
+    }
 }
