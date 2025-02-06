@@ -176,7 +176,7 @@ class YouTubeDownloader:
         return False
 
     def check_for_updates(self) -> None:
-        """Enhanced update checker with detailed version comparison and notifications"""
+        """Enhanced update checker that checks core files directly"""
         if not self.config.get('auto_update_check', True):
             return
             
@@ -196,126 +196,101 @@ class YouTubeDownloader:
             ) as progress:
                 progress.add_task("", total=None)
                 
-                # Get update settings
-                update_settings = self.config.get('update_settings', {})
-                show_commits = update_settings.get('show_commit_history', True)
-                max_commits = update_settings.get('max_commits_shown', 5)
-                check_beta = update_settings.get('check_beta_releases', False)
+                # Files to check for updates
+                core_files = [
+                    'src/main.py',
+                    'requirements.txt',
+                    'README.md',
+                    'config.json'
+                ]
                 
-                # Setup headers for GitHub API
                 headers = {
-                    'Accept': 'application/vnd.github.v3+json',
+                    'Accept': 'application/vnd.github.v3.raw',
                     'User-Agent': f'yt4-dw/{self.version}'
                 }
                 
-                # First try the API endpoint
-                try:
-                    if check_beta:
-                        response = requests.get(
-                            f"{self.api_url}/releases",
-                            headers=headers,
-                            timeout=10
-                        )
-                        if response.status_code == 200:
-                            releases = response.json()
-                            release_info = next((r for r in releases if not r['prerelease']), releases[0])
-                    else:
-                        response = requests.get(
-                            f"{self.api_url}/releases/latest",
-                            headers=headers,
-                            timeout=10
-                        )
-                        if response.status_code == 200:
-                            release_info = response.json()
-                        else:
-                            raise Exception(f"API request failed: {response.status_code}")
-                except Exception as api_error:
-                    # Fallback to raw version check
-                    console.print("[yellow]! GitHub API request failed, trying fallback method...[/yellow]")
+                # Check each core file
+                updates_available = []
+                for file in core_files:
                     try:
-                        version_url = f"{self.raw_content_url}/version.txt"
-                        response = requests.get(version_url, timeout=10)
+                        # Get remote file
+                        remote_url = f"{self.raw_content_url}/{file}"
+                        response = requests.get(remote_url, headers=headers, timeout=10)
+                        
                         if response.status_code == 200:
-                            latest_version = response.text.strip()
-                            release_info = {
-                                'tag_name': f"v{latest_version}",
-                                'body': "Please visit the repository for full changelog.",
-                                'html_url': self.repo_url
-                            }
-                        else:
-                            raise Exception("Failed to fetch version information")
-                    except Exception as fallback_error:
-                        raise Exception(f"Update check failed: {str(api_error)}. Fallback also failed: {str(fallback_error)}")
+                            remote_content = response.text
+                            
+                            # Special handling for main.py to extract version
+                            if file == 'src/main.py':
+                                remote_version = self._extract_version_from_content(remote_content)
+                                if remote_version and self._compare_versions(remote_version, self.version) > 0:
+                                    updates_available.append({
+                                        'file': file,
+                                        'type': 'version',
+                                        'current': self.version,
+                                        'new': remote_version
+                                    })
+                            
+                            # Check if local file exists and compare content
+                            local_path = os.path.join(self.base_dir, file)
+                            if os.path.exists(local_path):
+                                with open(local_path, 'r', encoding='utf-8') as f:
+                                    local_content = f.read()
+                                    if local_content.strip() != remote_content.strip():
+                                        updates_available.append({
+                                            'file': file,
+                                            'type': 'content'
+                                        })
+                            else:
+                                updates_available.append({
+                                    'file': file,
+                                    'type': 'missing'
+                                })
+                    except Exception as file_error:
+                        console.print(f"[yellow]! Warning: Could not check {file}: {str(file_error)}[/yellow]")
                 
-                latest_version = release_info['tag_name'].replace('v', '')
-                
-                # Compare versions
-                if self._compare_versions(latest_version, self.version) > 0:
+                if updates_available:
                     # Create update notification panel
                     update_info = Table.grid(padding=1)
                     
-                    # Show version info with release type
-                    release_type = " (Beta)" if release_info.get('prerelease', False) else ""
-                    update_info.add_row(
-                        f"[bold yellow]New version {latest_version}{release_type} available![/bold yellow]"
-                    )
-                    update_info.add_row(
-                        f"[white]Current version: {self.version}[/white]"
-                    )
-                    update_info.add_row("")
+                    # Show version update if available
+                    version_update = next((u for u in updates_available if u['type'] == 'version'), None)
+                    if version_update:
+                        update_info.add_row(
+                            f"[bold yellow]New version {version_update['new']} available![/bold yellow]"
+                        )
+                        update_info.add_row(
+                            f"[white]Current version: {version_update['current']}[/white]"
+                        )
+                        update_info.add_row("")
                     
-                    # Add changelog
-                    changes = release_info.get('body', 'No changelog available')
-                    if changes:
-                        update_info.add_row("[bold cyan]Changelog:[/bold cyan]")
-                        for line in changes.split('\n'):
-                            if line.strip():
-                                update_info.add_row(f"[white]• {line.strip()}[/white]")
-                    
-                    # Add recent commits if enabled and we have API access
-                    if show_commits and 'published_at' in release_info:
-                        try:
-                            commits_response = requests.get(
-                                f"{self.api_url}/commits",
-                                headers=headers,
-                                params={'since': release_info['published_at']},
-                                timeout=10
-                            )
-                            
-                            if commits_response.status_code == 200:
-                                commits = commits_response.json()
-                                if commits:
-                                    update_info.add_row("")
-                                    update_info.add_row("[bold cyan]Recent changes:[/bold cyan]")
-                                    for commit in commits[:max_commits]:
-                                        msg = commit['commit']['message'].split('\n')[0]
-                                        update_info.add_row(f"[white]• {msg}[/white]")
-                        except Exception:
-                            # Silently fail for commit history - it's not critical
-                            pass
+                    # Show file changes
+                    update_info.add_row("[bold cyan]Updates available:[/bold cyan]")
+                    for update in updates_available:
+                        if update['type'] == 'content':
+                            update_info.add_row(f"[white]• Modified: {update['file']}[/white]")
+                        elif update['type'] == 'missing':
+                            update_info.add_row(f"[white]• Missing: {update['file']}[/white]")
                     
                     # Add update instructions
                     update_info.add_row("")
                     update_info.add_row("[bold cyan]To update:[/bold cyan]")
-                    update_info.add_row(f"[white]1. Visit: {release_info.get('html_url', self.repo_url)}[/white]")
-                    update_info.add_row("[white]2. Download the latest release[/white]")
-                    update_info.add_row("[white]3. Follow the update instructions in the release notes[/white]")
-                    
-                    # Add auto-update reminder if disabled
-                    if not self.config.get('auto_update_check', True):
-                        update_info.add_row("")
-                        update_info.add_row("[yellow]Note: Auto-updates are currently disabled[/yellow]")
-                        update_info.add_row("[yellow]Enable them in config.json to receive automatic notifications[/yellow]")
+                    update_info.add_row("[white]1. Backup your current config.json[/white]")
+                    update_info.add_row("[white]2. Download the latest version:[/white]")
+                    update_info.add_row(f"[white]   {self.repo_url}/archive/refs/heads/main.zip[/white]")
+                    update_info.add_row("[white]3. Extract and replace your current files[/white]")
+                    update_info.add_row("[white]4. Restore your backed up config.json[/white]")
+                    update_info.add_row("[white]5. Run: pip install -r requirements.txt[/white]")
                     
                     # Display the update panel
                     console.print(Panel(
                         update_info,
-                        title="[bold yellow]Update Available[/bold yellow]",
+                        title="[bold yellow]Updates Available[/bold yellow]",
                         border_style="yellow",
                         padding=(1, 2)
                     ))
                 else:
-                    console.print("[green]✓ You are using the latest version![/green]")
+                    console.print("[green]✓ Your installation is up to date![/green]")
                 
                 # Update last check timestamp
                 self.config['last_update_check'] = current_time
@@ -326,23 +301,63 @@ class YouTubeDownloader:
             console.print("[yellow]You can manually check for updates at:[/yellow]")
             console.print(f"[blue]{self.repo_url}[/blue]")
     
+    def _extract_version_from_content(self, content: str) -> Optional[str]:
+        """Extract version number from main.py content"""
+        try:
+            for line in content.split('\n'):
+                if 'self.version = ' in line:
+                    # Extract everything between quotes
+                    version_match = line.split('=')[1].strip()
+                    # Remove any quotes and comments
+                    version = version_match.strip('"').strip("'").split('#')[0].strip()
+                    # Validate version format
+                    if self._is_valid_version(version):
+                        return version
+            return None
+        except Exception as e:
+            console.print(f"[yellow]! Warning: Version extraction failed: {str(e)}[/yellow]")
+            return None
+
+    def _is_valid_version(self, version: str) -> bool:
+        """Check if a string is a valid version number (e.g., '2.3.0')"""
+        try:
+            # Check if version matches X.Y.Z format
+            parts = version.split('.')
+            if len(parts) != 3:
+                return False
+            # Verify each part is a number
+            for part in parts:
+                if not part.isdigit():
+                    return False
+            return True
+        except Exception:
+            return False
+
     def _compare_versions(self, version1: str, version2: str) -> int:
         """Compare two version strings and return:
            1  if version1 > version2
            0  if version1 == version2
            -1 if version1 < version2
         """
-        def normalize(v):
-            return [int(x) for x in v.split('.')]
-        
-        v1 = normalize(version1)
-        v2 = normalize(version2)
-        
-        if v1 > v2:
-            return 1
-        elif v1 < v2:
-            return -1
-        return 0
+        try:
+            if not self._is_valid_version(version1) or not self._is_valid_version(version2):
+                raise ValueError("Invalid version format")
+
+            def normalize(v):
+                return [int(x) for x in v.split('.')]
+
+            v1 = normalize(version1)
+            v2 = normalize(version2)
+
+            for a, b in zip(v1, v2):
+                if a > b:
+                    return 1
+                elif a < b:
+                    return -1
+            return 0
+        except Exception as e:
+            console.print(f"[yellow]! Warning: Version comparison failed: {str(e)}[/yellow]")
+            return 0  # Return equal if comparison fails
 
     def display_welcome(self) -> None:
         """Display welcome screen with ASCII art and info"""
