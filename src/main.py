@@ -28,8 +28,11 @@ class YouTubeDownloader:
         self.cookies_dir = os.path.join(self.base_dir, 'cookies')
         self.cookies_path = os.path.join(self.cookies_dir, 'cookies.txt')
         self.version = "2.3.0"  # Updated version number
-        self.repo_url = "https://github.com/lyssadev/yt4-dw.git"
-        self.api_url = "https://api.github.com/repos/lyssadev/yt4-dw"
+        self.repo_owner = "lyssadev"
+        self.repo_name = "yt4-dw"
+        self.repo_url = f"https://github.com/{self.repo_owner}/{self.repo_name}"
+        self.api_url = f"https://api.github.com/repos/{self.repo_owner}/{self.repo_name}"
+        self.raw_content_url = f"https://raw.githubusercontent.com/{self.repo_owner}/{self.repo_name}/main"
         
         # Set download path based on environment
         if os.path.exists('/data/data/com.termux'):  # Check if running in Termux
@@ -199,17 +202,50 @@ class YouTubeDownloader:
                 max_commits = update_settings.get('max_commits_shown', 5)
                 check_beta = update_settings.get('check_beta_releases', False)
                 
-                # Get latest release info
-                if check_beta:
-                    response = requests.get(f"{self.api_url}/releases")
-                    if response.status_code == 200:
-                        releases = response.json()
-                        release_info = next((r for r in releases if not r['prerelease']), releases[0])
-                else:
-                    response = requests.get(f"{self.api_url}/releases/latest")
-                    if response.status_code != 200:
-                        raise Exception(f"Failed to fetch release info: {response.status_code}")
-                    release_info = response.json()
+                # Setup headers for GitHub API
+                headers = {
+                    'Accept': 'application/vnd.github.v3+json',
+                    'User-Agent': f'yt4-dw/{self.version}'
+                }
+                
+                # First try the API endpoint
+                try:
+                    if check_beta:
+                        response = requests.get(
+                            f"{self.api_url}/releases",
+                            headers=headers,
+                            timeout=10
+                        )
+                        if response.status_code == 200:
+                            releases = response.json()
+                            release_info = next((r for r in releases if not r['prerelease']), releases[0])
+                    else:
+                        response = requests.get(
+                            f"{self.api_url}/releases/latest",
+                            headers=headers,
+                            timeout=10
+                        )
+                        if response.status_code == 200:
+                            release_info = response.json()
+                        else:
+                            raise Exception(f"API request failed: {response.status_code}")
+                except Exception as api_error:
+                    # Fallback to raw version check
+                    console.print("[yellow]! GitHub API request failed, trying fallback method...[/yellow]")
+                    try:
+                        version_url = f"{self.raw_content_url}/version.txt"
+                        response = requests.get(version_url, timeout=10)
+                        if response.status_code == 200:
+                            latest_version = response.text.strip()
+                            release_info = {
+                                'tag_name': f"v{latest_version}",
+                                'body': "Please visit the repository for full changelog.",
+                                'html_url': self.repo_url
+                            }
+                        else:
+                            raise Exception("Failed to fetch version information")
+                    except Exception as fallback_error:
+                        raise Exception(f"Update check failed: {str(api_error)}. Fallback also failed: {str(fallback_error)}")
                 
                 latest_version = release_info['tag_name'].replace('v', '')
                 
@@ -236,26 +272,32 @@ class YouTubeDownloader:
                             if line.strip():
                                 update_info.add_row(f"[white]• {line.strip()}[/white]")
                     
-                    # Add recent commits if enabled
-                    if show_commits:
-                        commits_response = requests.get(
-                            f"{self.api_url}/commits",
-                            params={'since': release_info['published_at']}
-                        )
-                        
-                        if commits_response.status_code == 200:
-                            commits = commits_response.json()
-                            if commits:
-                                update_info.add_row("")
-                                update_info.add_row("[bold cyan]Recent changes:[/bold cyan]")
-                                for commit in commits[:max_commits]:
-                                    msg = commit['commit']['message'].split('\n')[0]
-                                    update_info.add_row(f"[white]• {msg}[/white]")
+                    # Add recent commits if enabled and we have API access
+                    if show_commits and 'published_at' in release_info:
+                        try:
+                            commits_response = requests.get(
+                                f"{self.api_url}/commits",
+                                headers=headers,
+                                params={'since': release_info['published_at']},
+                                timeout=10
+                            )
+                            
+                            if commits_response.status_code == 200:
+                                commits = commits_response.json()
+                                if commits:
+                                    update_info.add_row("")
+                                    update_info.add_row("[bold cyan]Recent changes:[/bold cyan]")
+                                    for commit in commits[:max_commits]:
+                                        msg = commit['commit']['message'].split('\n')[0]
+                                        update_info.add_row(f"[white]• {msg}[/white]")
+                        except Exception:
+                            # Silently fail for commit history - it's not critical
+                            pass
                     
                     # Add update instructions
                     update_info.add_row("")
                     update_info.add_row("[bold cyan]To update:[/bold cyan]")
-                    update_info.add_row("[white]1. Visit: https://github.com/lyssadev/yt4-dw/releases[/white]")
+                    update_info.add_row(f"[white]1. Visit: {release_info.get('html_url', self.repo_url)}[/white]")
                     update_info.add_row("[white]2. Download the latest release[/white]")
                     update_info.add_row("[white]3. Follow the update instructions in the release notes[/white]")
                     
@@ -272,6 +314,8 @@ class YouTubeDownloader:
                         border_style="yellow",
                         padding=(1, 2)
                     ))
+                else:
+                    console.print("[green]✓ You are using the latest version![/green]")
                 
                 # Update last check timestamp
                 self.config['last_update_check'] = current_time
@@ -279,6 +323,8 @@ class YouTubeDownloader:
                 
         except Exception as e:
             console.print(f"[red]! Failed to check for updates: {str(e)}[/red]")
+            console.print("[yellow]You can manually check for updates at:[/yellow]")
+            console.print(f"[blue]{self.repo_url}[/blue]")
     
     def _compare_versions(self, version1: str, version2: str) -> int:
         """Compare two version strings and return:
