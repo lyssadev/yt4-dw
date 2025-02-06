@@ -1,10 +1,10 @@
 {
-    "cookies": "/home/runner/yt4-dw/cookies/cookies.txt",
-    "download_path": "/home/runner/Downloads/yt4-dw",
-    "last_used_quality": "1080p",
+    "cookies": "cookies/cookies.txt",
+    "download_path": "downloads",
+    "last_used_quality": "1080p (Full HD)",
     "auto_update_check": true,
     "update_check_interval": 24,
-    "last_update_check": 1738811004.6084006,
+    "last_update_check": 0,
     "preferred_audio_format": "m4a",
     "download_settings": {
         "max_retries": 3,
@@ -29,7 +29,7 @@
         "show_eta": true,
         "show_speed": true,
         "show_size": true,
-        "color_scheme": "professional",
+        "color_scheme": "default",
         "progress_bar_style": "smooth",
         "use_animations": true
     },

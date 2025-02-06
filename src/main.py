@@ -82,7 +82,7 @@ class YouTubeDownloader:
         self.config_path = os.path.join(self.base_dir, 'config.json')
         self.cookies_dir = os.path.join(self.base_dir, 'cookies')
         self.cookies_path = os.path.join(self.cookies_dir, 'cookies.txt')
-        self.version = "3.0.0"  # Major version update
+        self.version = "3.2.0"  # Updated version
         
         # Repository information
         self.repo_owner = "lyssadev"
@@ -95,14 +95,10 @@ class YouTubeDownloader:
         self.system = platform.system().lower()
         self.is_termux = os.path.exists('/data/data/com.termux')
         
-        # Set download path based on environment
-        if self.is_termux:
-            self.download_path = os.path.join('/storage/emulated/0/Download', 'yt4-dw')
-        else:
-            self.download_path = os.path.expanduser("~/Downloads/yt4-dw")
+        # Set download path to current directory
+        self.download_path = os.getcwd()
         
         # Create necessary directories
-        os.makedirs(self.download_path, exist_ok=True)
         os.makedirs(self.cookies_dir, exist_ok=True)
         
         # Initialize configuration
@@ -742,29 +738,91 @@ class YouTubeDownloader:
 
     def download_video(self, url: str, format_id: str, cookies: Optional[str] = None) -> None:
         """Download video in specified format"""
+        # Determine if this is an audio-only download
+        is_audio = 'bestaudio' in format_id
+        
+        # Create output template based on format
+        if is_audio:
+            output_template = os.path.join(self.download_path, 'audio', '%(title)s.%(ext)s')
+            os.makedirs(os.path.join(self.download_path, 'audio'), exist_ok=True)
+        else:
+            output_template = os.path.join(self.download_path, 'video', '%(title)s.%(ext)s')
+            os.makedirs(os.path.join(self.download_path, 'video'), exist_ok=True)
+
         ydl_opts = {
             'format': format_id,
-            'outtmpl': os.path.join(self.download_path, '%(title)s.%(ext)s'),
+            'outtmpl': output_template,
             'cookiefile': cookies if cookies else None,
             'progress_hooks': [self.progress_hook],
-            'merge_output_format': 'mp4',  # Force MP4 output
-            'no_playlist': True,  # Prevent playlist downloads
-            'noplaylist': True,   # Additional playlist prevention
-            'postprocessors': [{
-                'key': 'FFmpegVideoConvertor',
-                'preferedformat': 'mp4',  # Force MP4 conversion
-            }],
+            'merge_output_format': 'mp4' if not is_audio else None,
+            'no_playlist': True,
+            'noplaylist': True,
+            'writethumbnail': True,
+            'embedthumbnail': True,
+            'addmetadata': True,
+            'prefer_ffmpeg': True,
+            'concurrent_fragment_downloads': 8,
+            'format_sort': [
+                'res',
+                'fps',
+                'codec:h264',
+                'br',
+                'asr',
+                'size'
+            ],
+            'postprocessors': []
         }
 
-        # For MP3, add specific audio options
-        if format_id == "bestaudio/best":
-            ydl_opts['postprocessors'] = [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '320',  # Highest quality MP3
-            }]
-            ydl_opts['format'] = 'bestaudio/best'
-            ydl_opts['merge_output_format'] = None
+        # Configure postprocessors based on format
+        if is_audio:
+            if 'WAV' in self.config.get('last_used_quality', ''):
+                ydl_opts['postprocessors'].append({
+                    'key': 'FFmpegExtractAudio',
+                    'preferredcodec': 'wav',
+                    'preferredquality': '0',  # Best quality for WAV
+                })
+                console.print("[yellow]ℹ Converting to WAV format (lossless)[/yellow]")
+            elif 'M4A' in self.config.get('last_used_quality', ''):
+                ydl_opts['postprocessors'].append({
+                    'key': 'FFmpegExtractAudio',
+                    'preferredcodec': 'm4a',
+                    'preferredquality': '0',  # Best quality
+                })
+                console.print("[yellow]ℹ Converting to M4A format (AAC 256kbps)[/yellow]")
+            else:  # MP3
+                ydl_opts['postprocessors'].append({
+                    'key': 'FFmpegExtractAudio',
+                    'preferredcodec': 'mp3',
+                    'preferredquality': '320',  # 320kbps
+                })
+                console.print("[yellow]ℹ Converting to MP3 format (320kbps)[/yellow]")
+
+            # Add metadata and thumbnail for supported formats
+            if 'WAV' not in self.config.get('last_used_quality', ''):  # WAV doesn't support embedded metadata/thumbnails
+                ydl_opts['postprocessors'].extend([
+                    {
+                        'key': 'FFmpegMetadata',
+                        'add_metadata': True,
+                    },
+                    {
+                        'key': 'EmbedThumbnail',
+                    }
+                ])
+        else:
+            # Video postprocessors
+            ydl_opts['postprocessors'].extend([
+                {
+                    'key': 'FFmpegVideoConvertor',
+                    'preferedformat': 'mp4',
+                },
+                {
+                    'key': 'FFmpegMetadata',
+                    'add_metadata': True,
+                },
+                {
+                    'key': 'EmbedThumbnail',
+                }
+            ])
 
         with Progress(
             SpinnerColumn(),
@@ -776,8 +834,24 @@ class YouTubeDownloader:
             
             try:
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    info = ydl.extract_info(url, download=False)
+                    if info:
+                        selected_format = next(
+                            (f for f in info['formats'] 
+                             if f.get('format_id') == info.get('format_id')),
+                            None
+                        )
+                        if selected_format:
+                            self._print_format_info(selected_format)
+                    
+                    # Perform the download
                     ydl.download([url])
-                console.print("[green]✓ Download completed successfully![/green]")
+                
+                # Show success message with file location
+                if is_audio:
+                    console.print(f"[green]✓ Audio downloaded successfully to: {os.path.join(self.download_path, 'audio')}[/green]")
+                else:
+                    console.print(f"[green]✓ Video downloaded successfully to: {os.path.join(self.download_path, 'video')}[/green]")
             except Exception as e:
                 console.print(f"[red]Error during download: {str(e)}[/red]")
 
@@ -824,93 +898,64 @@ class YouTubeDownloader:
         # Combine all choices
         choices = video_qualities + audio_qualities
 
-        # Ask user for choice using questionary instead of inquirer
+        # Get the last used quality from config
+        last_used = self.config.get('last_used_quality', '1080p (Full HD)')
+        
+        # Find the best matching choice for the last used quality
+        default_choice = next(
+            (choice for choice in choices if last_used in choice),
+            '1080p (Full HD)'  # Fallback to 1080p if no match found
+        )
+
+        # Ask user for choice using questionary
         chosen_quality = questionary.select(
             'Select maximum quality (will automatically select best available up to this quality):',
             choices=choices,
-            default=self.config.get('last_used_quality', '720p (HD)')
+            default=default_choice
         ).ask()
-        
-        # Clean up the quality string for internal use
-        if '(' in chosen_quality:
-            chosen_quality = chosen_quality.split(' (')[0]  # Extract just the quality value
 
-        # Save the choice
+        # Save the full quality string (including description)
         self.config['last_used_quality'] = chosen_quality
         self.save_config(self.config)
 
-        return chosen_quality
+        # Extract just the quality value for format selection
+        quality = chosen_quality.split(' (')[0]
+        return quality
 
     def get_best_format_for_quality(self, formats: list, chosen_quality: str) -> str:
         """Get the best available format that matches the user's quality preference"""
         if 'Audio Only' in chosen_quality:
-            audio_formats = [f for f in formats if f.get('acodec') != 'none' and f.get('vcodec') == 'none']
-            
             if 'WAV' in chosen_quality:
-                format_id = 'bestaudio[ext=wav]/bestaudio/best'
-                console.print("[yellow]ℹ Selecting best WAV audio quality[/yellow]")
+                # For WAV, we want lossless audio
+                console.print("[yellow]ℹ Selecting best WAV audio quality (lossless)[/yellow]")
+                return "bestaudio/best"  # We'll convert to WAV in the postprocessor
             elif 'M4A' in chosen_quality:
-                format_id = 'bestaudio[ext=m4a]/bestaudio/best'
+                # For M4A, prefer m4a container
                 console.print("[yellow]ℹ Selecting best M4A audio quality[/yellow]")
+                return "bestaudio[ext=m4a]/bestaudio/best"
             else:  # MP3
-                format_id = 'bestaudio[ext=mp3]/bestaudio/best'
+                # For MP3, select best audio for conversion
                 console.print("[yellow]ℹ Selecting best MP3 audio quality (320kbps)[/yellow]")
-            
-            return format_id
-        else:
-            # Extract the height from the quality string (e.g., "1080p" -> 1080)
-            target_height = int(chosen_quality.replace('p', ''))
-            
-            # First try to find formats with both video and audio
-            video_formats = [f for f in formats 
-                           if f.get('vcodec') != 'none' 
-                           and f.get('acodec') != 'none'
-                           and f.get('height', 0) <= target_height]
-            
-            if video_formats:
-                # Sort by height, then by bitrate, then by filesize
-                video_formats.sort(key=lambda x: (
-                    x.get('height', 0),
-                    x.get('tbr', 0),  # Total bitrate
-                    x.get('filesize', 0)
-                ), reverse=True)
-                
-                best_format = video_formats[0]
-                actual_height = best_format.get('height', 0)
-                actual_fps = best_format.get('fps', 0)
-                actual_vcodec = best_format.get('vcodec', 'unknown')
-                actual_acodec = best_format.get('acodec', 'unknown')
-                
-                # Show detailed format information
-                console.print(f"[yellow]ℹ Best available quality details:[/yellow]")
-                console.print(f"[yellow]  • Resolution: {actual_height}p[/yellow]")
-                console.print(f"[yellow]  • FPS: {actual_fps}[/yellow]")
-                console.print(f"[yellow]  • Video codec: {actual_vcodec}[/yellow]")
-                console.print(f"[yellow]  • Audio codec: {actual_acodec}[/yellow]")
-                
-                return best_format['format_id']
-            else:
-                # If no combined format found, try separate video+audio approach
-                console.print("[yellow]ℹ No combined format found, selecting best video and audio separately[/yellow]")
-                
-                # Get best video format below or equal to target height
-                video_formats = [f for f in formats 
-                               if f.get('vcodec') != 'none' 
-                               and f.get('height', 0) <= target_height]
-                
-                if video_formats:
-                    video_formats.sort(key=lambda x: (
-                        x.get('height', 0),
-                        x.get('tbr', 0),
-                        x.get('filesize', 0)
-                    ), reverse=True)
-                    
-                    best_video = video_formats[0]
-                    actual_height = best_video.get('height', 0)
-                    console.print(f"[yellow]ℹ Selected video quality: {actual_height}p[/yellow]")
-                
-                # Return format string for best video + best audio
-                return f"bestvideo[height<={target_height}][ext=mp4]+bestaudio[ext=m4a]/best[height<={target_height}]/best"
+                return "bestaudio/best"  # We'll convert to MP3 in the postprocessor
+        
+        # Extract the height from the quality string (e.g., "1080p" -> 1080)
+        target_height = int(chosen_quality.replace('p', ''))
+        
+        # Use yt-dlp's advanced format selection
+        # This will:
+        # 1. Try to find best video with target height and high fps
+        # 2. Fallback to best video with target height
+        # 3. Include best audio stream
+        # 4. Prefer h264 codec for better compatibility
+        format_str = (
+            f"bestvideo[height<={target_height}][vcodec^=avc1][fps>30]"
+            f"/bestvideo[height<={target_height}][vcodec^=avc1]"
+            f"/bestvideo[height<={target_height}][fps>30]"
+            f"/bestvideo[height<={target_height}]"
+            f"+bestaudio[ext=m4a]/bestaudio"
+        )
+        
+        return format_str
 
     def get_cookies_path(self) -> Optional[str]:
         """Get the path to cookies file"""
@@ -1016,6 +1061,43 @@ class YouTubeDownloader:
 
         # Show exit message
         console.print("\n[cyan]Thank you for using YT4-DW! ♥[/cyan]")
+
+    def _print_format_info(self, format_dict: dict) -> None:
+        """Print format information with proper handling of missing values"""
+        try:
+            # Extract format details with safe fallbacks
+            height = format_dict.get('height', 0)
+            fps = format_dict.get('fps', 0)
+            vcodec = format_dict.get('vcodec', 'unknown')
+            acodec = format_dict.get('acodec', 'unknown')
+            tbr = format_dict.get('tbr', 0)
+            filesize = format_dict.get('filesize', 0)
+            
+            # Print format information
+            console.print(f"[yellow]ℹ Selected format details:[/yellow]")
+            
+            # For video formats
+            if vcodec != 'none':
+                console.print(f"[yellow]  • Resolution: {height}p[/yellow]")
+                console.print(f"[yellow]  • FPS: {fps}[/yellow]")
+                console.print(f"[yellow]  • Video codec: {vcodec}[/yellow]")
+            
+            # For audio formats
+            if acodec != 'none':
+                console.print(f"[yellow]  • Audio codec: {acodec}[/yellow]")
+            
+            # Show bitrate if available
+            if tbr:
+                console.print(f"[yellow]  • Total bitrate: {tbr:.2f} Mbps[/yellow]")
+            
+            # Show filesize if available
+            if filesize:
+                size_mb = filesize / (1024 * 1024)
+                console.print(f"[yellow]  • File size: {size_mb:.2f} MB[/yellow]")
+            
+        except Exception as e:
+            # If anything goes wrong, just show a simple message
+            console.print("[yellow]ℹ Format information not available[/yellow]")
 
 def main():
     try:

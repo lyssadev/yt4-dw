@@ -1,253 +1,171 @@
-# YT4 DW - Professional YouTube Downloader
+# YT4-DW v3.2.0
 
-<div align="center">
+A professional YouTube downloader with enhanced features and a beautiful CLI interface.
 
-![YT4 DW Logo](https://raw.githubusercontent.com/lyssadev/yt4-dw/main/assets/logo.png)
+## Features
 
-A powerful and professional-grade YouTube downloader optimized for Linux and Termux
+- 🎥 High Quality Video Downloads (up to 8K)
+- 🎵 Studio Quality Audio (WAV, M4A, MP3)
+- 🚀 Fast Downloads with Concurrent Processing
+- 🎨 Beautiful Terminal Interface
+- 📊 Detailed Progress Information
+- 🔒 Cookie Support for Private Videos
+- 🎯 Smart Format Selection
+- 💾 Automatic Metadata Embedding
+- 🖼️ Thumbnail Embedding
+- 🔄 Auto-Update Checking
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.7+](https://img.shields.io/badge/python-3.7+-blue.svg)](https://www.python.org/downloads/)
-[![yt-dlp](https://img.shields.io/badge/powered%20by-yt--dlp-red.svg)](https://github.com/yt-dlp/yt-dlp)
-[![Version](https://img.shields.io/badge/version-3.0.0-green.svg)](https://github.com/lyssadev/yt4-dw/releases)
+## Requirements
 
-</div>
-
-## 🌟 Professional Features
-
-### 🎥 Video Processing
-- **Advanced Quality Selection**
-  - Up to 4K/2160p resolution support
-  - Smart quality adaptation
-  - Codec optimization (H.264/AVC, VP9)
-  - Frame rate preservation (60fps support)
-  - HDR content handling
-  
-### 🎵 Audio Engineering
-- **Studio-Grade Audio**
-  - Lossless WAV extraction
-  - High-quality AAC encoding (256kbps)
-  - Professional MP3 export (320kbps)
-  - Multi-track audio support
-  - Audio normalization
-
-### 🎨 Enhanced Interface
-- **Professional UI/UX**
-  - Animated ASCII art
-  - Rich color schemes
-  - Progress visualization
-  - System information display
-  - Real-time statistics
-  - Dynamic layouts
-
-### 🚀 Performance
-- **Optimized Engine**
-  - Multi-threaded downloads
-  - Smart chunk handling
-  - Bandwidth optimization
-  - Resource management
-  - Cache utilization
-  - Background processing
-
-### 🛡️ Security Features
-- **Enhanced Protection**
-  - Secure cookie handling
-  - Config file encryption
-  - Automatic backups
-  - Update verification
-  - Safe mode operation
-
-### ⚙️ Advanced Configuration
-- **Professional Settings**
-  - Custom download paths
-  - Format preferences
-  - Network optimization
-  - Proxy support
-  - Debug options
-  - Logging system
-
-## 🔧 System Requirements
-
-### Minimum Requirements
-- Python 3.7+
-- 2GB RAM
-- 1GB free disk space
+- Python 3.8 or higher
+- FFmpeg
 - Internet connection
 
-### Recommended
-- Python 3.9+
-- 4GB RAM
-- SSD storage
-- Broadband connection
+## Installation
 
-## 📦 Installation
+### Quick Install (Linux/macOS)
 
-### One-Command Installation
 ```bash
-curl -sSL https://raw.githubusercontent.com/lyssadev/yt4-dw/main/install.sh | bash
+# Clone the repository
+git clone https://github.com/lyssadev/yt4-dw.git
+cd yt4-dw
+
+# Run installer
+chmod +x install.sh
+./install.sh
 ```
 
 ### Manual Installation
 
-#### Linux
+1. Install Python requirements:
 ```bash
-# Install dependencies
-sudo apt update
-sudo apt install python3 python3-pip ffmpeg git
-
-# Clone repository
-git clone https://github.com/lyssadev/yt4-dw.git
-cd yt4-dw
-
-# Install Python packages
-pip3 install -r requirements.txt
-```
-
-#### Termux
-```bash
-# Update system
-pkg update && pkg upgrade
-
-# Install dependencies
-pkg install python ffmpeg git
-
-# Setup storage
-termux-setup-storage
-
-# Clone and install
-git clone https://github.com/lyssadev/yt4-dw.git
-cd yt4-dw
 pip install -r requirements.txt
 ```
 
-## 🎮 Professional Usage
+2. Install FFmpeg:
+- Ubuntu/Debian: `sudo apt install ffmpeg`
+- Fedora: `sudo dnf install ffmpeg`
+- macOS: `brew install ffmpeg`
+- Windows: Download from [FFmpeg website](https://ffmpeg.org/download.html)
 
-### Basic Operation
+3. Make the script executable:
 ```bash
-python3 src/main.py
+chmod +x src/main.py
 ```
 
-### Command Line Options
-```bash
-python3 src/main.py [OPTIONS]
+## Usage
 
-Options:
-  --quality QUALITY    Set preferred quality
-  --format FORMAT     Set output format
-  --path PATH        Set download path
-  --debug           Enable debug mode
-  --config FILE     Use custom config
-  --no-color       Disable colors
+1. Basic usage:
+```bash
+./src/main.py
 ```
 
-### Quality Presets
-- **Video Qualities**
-  - 2160p (4K Ultra HD)
-  - 1440p (2K Quad HD)
-  - 1080p (Full HD)
-  - 720p (HD)
-  - 480p (SD)
-  - 360p (Low)
-  - 240p (Mobile)
-  - 144p (Minimal)
+2. Follow the interactive prompts:
+   - Enter YouTube URL
+   - Select quality
+   - Wait for download to complete
 
-- **Audio Qualities**
-  - WAV (Studio Lossless)
-  - M4A (AAC 256kbps)
-  - MP3 (320kbps)
+## Quality Options
 
-## ⚙️ Advanced Configuration
+### Video
+- 1440p (2K QHD)
+- 1080p (Full HD)
+- 720p (HD)
+- 480p (SD)
+- 360p (SD)
+- 240p (Low)
+- 144p (Very Low)
 
-### Configuration File
+### Audio
+- WAV (Lossless)
+- M4A (AAC 256kbps)
+- MP3 (320kbps)
+
+## Configuration
+
+The `config.json` file contains various settings:
+
 ```json
 {
-    "download_settings": {
-        "max_retries": 3,
-        "timeout": 30,
-        "chunk_size": 8192,
-        "max_concurrent_downloads": 1,
-        "use_aria2": false,
-        "rate_limit": 0
-    },
-    "format_settings": {
-        "prefer_quality": "1080p",
-        "video_codec": "h264",
-        "audio_codec": "aac",
-        "container": "mp4"
-    },
-    "ui_settings": {
-        "show_thumbnails": true,
-        "color_scheme": "professional",
-        "progress_bar_style": "smooth"
+    "download_path": "downloads",
+    "last_used_quality": "1080p (Full HD)",
+    "auto_update_check": true,
+    "preferred_audio_format": "m4a",
+    ...
+}
+```
+
+## Private Videos
+
+To download private or age-restricted videos:
+
+1. Install a browser extension like "Get cookies.txt"
+2. Export cookies from YouTube
+3. Place the cookies.txt file in the `cookies` directory
+
+## Updates
+
+The script automatically checks for updates. You can also manually update:
+
+```bash
+git pull origin main
+pip install -r requirements.txt
+```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **FFmpeg not found**
+   - Ensure FFmpeg is installed and in your PATH
+   - Try reinstalling FFmpeg
+
+2. **Download fails**
+   - Check your internet connection
+   - Verify the video URL
+   - Try using cookies for restricted content
+
+3. **Quality not available**
+   - The script will automatically select the best available quality
+   - Some videos may not have all quality options
+
+### Debug Mode
+
+Enable debug mode in config.json:
+```json
+{
+    "advanced_settings": {
+        "debug_mode": true
     }
 }
 ```
 
-### Environment Variables
-```bash
-YT4DW_CONFIG=/path/to/config.json
-YT4DW_DOWNLOADS=/path/to/downloads
-YT4DW_COOKIES=/path/to/cookies.txt
-YT4DW_DEBUG=1
-```
+## Contributing
 
-## 🔄 Update System
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
 
-### Automatic Updates
-- Version checking
-- Changelog display
-- File verification
-- Backup creation
-- Safe installation
+## License
 
-### Manual Update
-```bash
-git pull origin main
-pip install -r requirements.txt --upgrade
-```
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-## 📊 Statistics
+## Acknowledgments
 
-- Download history
-- Speed analysis
-- Quality metrics
-- Error tracking
-- Usage patterns
+- [yt-dlp](https://github.com/yt-dlp/yt-dlp) for the core downloading functionality
+- [FFmpeg](https://ffmpeg.org/) for media processing
+- All contributors and users of YT4-DW
 
-## 🤝 Professional Support
+## Support
 
-### Community
-- GitHub Issues
-- Feature Requests
-- Bug Reports
-- Documentation
+If you find this tool useful, please consider:
+- Star the repository
+- Report bugs
+- Share with others
+- Contribute to the code
 
-### Development
-- Pull Requests
-- Code Reviews
-- Testing
-- Documentation
+## Disclaimer
 
-## 📄 License & Credits
-
-### License
-MIT License - see [LICENSE](LICENSE)
-
-### Created by
-- **Lead Developer**: [lyssadev](https://github.com/lyssadev)
-- **Core Developer**: [Chifft](https://github.com/chifft)
-- **Systems Engineer**: [Xzyyy](https://github.com/xzyyysh)
-
-### Special Thanks
-- [yt-dlp](https://github.com/yt-dlp/yt-dlp) team
-- Open source community
-- All contributors
-
-## ⚠️ Professional Guidelines
-
-Please respect:
-- YouTube's Terms of Service
-- Content creators' rights
-- Copyright laws
-- Network policies
-- Privacy regulations
+This tool is for personal use only. Please respect YouTube's terms of service and content creators' rights.
